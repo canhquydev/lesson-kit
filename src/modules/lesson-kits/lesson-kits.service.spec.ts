@@ -78,6 +78,9 @@ describe('LessonKitsService', () => {
       mockLessonKitModel.create.mockResolvedValue(mockCreatedKit);
 
       const dto: CreateLessonKitDto = {
+        subject: 'VAT_LI',
+        grade: '10',
+        lesson_topic: 'Định luật Newton',
         lesson_content_id: validObjectId.toHexString(),
         duration: 45,
         support_level: SupportLevel.B1,

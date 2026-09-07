@@ -38,6 +38,9 @@ describe('LessonKitsController', () => {
   describe('generate', () => {
     it('should create kit and return accepted status', async () => {
       const dto: CreateLessonKitDto = {
+        subject: 'VAT_LI',
+        grade: '10',
+        lesson_topic: 'Định luật Newton',
         lesson_content_id: '507f1f77bcf86cd799439011',
         duration: 45,
         support_level: SupportLevel.B1,
