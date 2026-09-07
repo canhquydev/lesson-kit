@@ -28,6 +28,7 @@ export class LessonKit {
 
   /** Trạng thái: draft | generating | completed | failed */
   @Prop({
+    type: String,
     required: true,
     enum: LessonKitStatus,
     default: LessonKitStatus.GENERATING,

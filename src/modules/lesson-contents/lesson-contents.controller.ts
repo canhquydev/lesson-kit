@@ -6,12 +6,9 @@ import { BaseResponseDto } from '../../common/dto';
 export class LessonContentsController {
   constructor(
     private readonly lessonContentsService: LessonContentsService,
-  ) {}
+  ) { }
 
-  /**
-   * GET /api/lessons?subject=VAT_LI&grade=10
-   * Danh sách bài học theo môn + lớp
-   */
+
   @Get()
   async findAll(
     @Query('subject') subject: string,
