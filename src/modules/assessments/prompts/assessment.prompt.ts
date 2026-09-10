@@ -4,9 +4,24 @@ import { AssessmentQuestionType } from '../constants';
 export const ASSESSMENT_SYSTEM_PROMPT =
   'You are an expert assessment designer for Vietnamese school curricula. Assess lesson-content mastery, not English proficiency, and return only a valid JSON object matching the requested schema.';
 
+export interface AssessmentTeachingScriptInput {
+  activity_name: string;
+  objective: string;
+  teacher_speech_en?: string;
+  teacher_speech_vi?: string;
+  step_order?: number;
+}
+
+export interface AssessmentActivityInput {
+  activity_name: string;
+  duration_minutes: number;
+  objective?: string;
+  expected_outcome?: string;
+}
+
 export interface AssessmentPromptDependencies {
-  teachingScripts: readonly unknown[];
-  activities: readonly unknown[];
+  teachingScripts: readonly AssessmentTeachingScriptInput[];
+  activities: readonly AssessmentActivityInput[];
 }
 
 function formatRetryErrors(retryErrors: readonly string[]): string {
@@ -64,7 +79,7 @@ ${JSON.stringify(dependencies.activities, null, 2)}
     {
       "question_text": "Nội dung câu hỏi",
       "question_type": "multiple_choice | true_false | matching | short_answer",
-      "options": ["Lựa chọn A", "Lựa chọn B", "Lựa chọn C", "Lựa chọn D"],
+      "options": ["Tuân theo chính xác quy tắc 5-7 tương ứng với question_type"],
       "correct_answer": "Đáp án đúng",
       "explanation": "Giải thích ngắn gọn",
       "sort_order": 1

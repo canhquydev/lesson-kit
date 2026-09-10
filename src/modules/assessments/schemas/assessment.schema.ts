@@ -1,6 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { AssessmentQuestionType } from '../constants';
+import {
+  hasValidAssessmentCorrectAnswer,
+  hasValidAssessmentOptions,
+} from '../validators';
 
 export type AssessmentDocument = HydratedDocument<Assessment>;
 
@@ -24,10 +28,32 @@ export class Assessment {
   })
   question_type: AssessmentQuestionType;
 
-  @Prop({ type: [String], default: [] })
+  @Prop({
+    type: [String],
+    default: [],
+    validate: {
+      validator(this: Assessment, options: unknown): boolean {
+        return hasValidAssessmentOptions(this.question_type, options);
+      },
+      message: 'Invalid options for question_type.',
+    },
+  })
   options: string[];
 
-  @Prop({ required: true, trim: true })
+  @Prop({
+    required: true,
+    trim: true,
+    validate: {
+      validator(this: Assessment, correctAnswer: unknown): boolean {
+        return hasValidAssessmentCorrectAnswer(
+          this.question_type,
+          correctAnswer,
+          this.options,
+        );
+      },
+      message: 'Invalid correct_answer for question_type and options.',
+    },
+  })
   correct_answer: string;
 
   @Prop({ required: true, trim: true })

@@ -114,9 +114,13 @@ describe('TeachingScripts Day 1 artifacts', () => {
   describe('prompt', () => {
     it('includes the context, all Phase 1 dependencies, and output contract', () => {
       const prompt = buildTeachingScriptPrompt(context, {
-        vocabularies: [{ term: 'force' }],
-        expressions: [{ expression: 'Raise your hand' }],
-        activities: [{ activity_name: 'Pair discussion' }],
+        vocabularies: [{ word: 'force', meaning_vi: 'lực' }],
+        expressions: [
+          { expression_en: 'Raise your hand', translation_vi: 'Giơ tay lên.' },
+        ],
+        activities: [
+          { activity_name: 'Pair discussion', duration_minutes: 45 },
+        ],
       });
 
       expect(TEACHING_SCRIPT_SYSTEM_PROMPT).toContain('valid JSON object');

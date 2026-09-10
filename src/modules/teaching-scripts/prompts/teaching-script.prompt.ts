@@ -3,10 +3,44 @@ import { GenerationContext } from '../../../common/interfaces';
 export const TEACHING_SCRIPT_SYSTEM_PROMPT =
   'You are an expert bilingual curriculum designer for English-medium instruction in Vietnamese schools. Return only a valid JSON object matching the requested schema.';
 
+export interface TeachingVocabularyPromptItem {
+  word: string;
+  meaning_vi: string;
+  phonetic?: string;
+  part_of_speech?: string;
+  example_sentence?: string;
+  context_note?: string;
+  sort_order?: number;
+}
+
+export interface TeachingExpressionPromptItem {
+  expression_en: string;
+  translation_vi: string;
+  category?: string;
+  situation_note?: string;
+  sort_order?: number;
+}
+
+export interface TeachingActivityPromptItem {
+  activity_name: string;
+  duration_minutes: number;
+  activity_type?: string;
+  description?: string;
+  objective?: string;
+  group_type?: string;
+  instructions?: string;
+  english_instructions?: string;
+  student_task?: string;
+  expected_outcome?: string;
+}
+
 export interface TeachingScriptPromptDependencies {
-  vocabularies: readonly unknown[];
-  expressions: readonly unknown[];
-  activities: readonly unknown[];
+  /** Tên chuẩn dùng trong service hiện tại. */
+  vocabularies?: readonly TeachingVocabularyPromptItem[];
+  /** Alias tương thích với lời gọi pipeline trong Task Assignment. */
+  vocab?: readonly TeachingVocabularyPromptItem[];
+  expressions: readonly TeachingExpressionPromptItem[];
+  activities: readonly TeachingActivityPromptItem[];
 }
 
 function formatRetryErrors(retryErrors: readonly string[]): string {
@@ -26,6 +60,8 @@ export function buildTeachingScriptPrompt(
   dependencies: TeachingScriptPromptDependencies,
   retryErrors: readonly string[] = [],
 ): string {
+  const vocabularies = dependencies.vocabularies ?? dependencies.vocab ?? [];
+
   return `Bạn là chuyên gia thiết kế kịch bản giảng dạy song ngữ cho giáo viên phổ thông Việt Nam.
 Hãy tạo KỊCH BẢN GIẢNG (Phase 2) từ Lesson Context và toàn bộ kết quả Phase 1 dưới đây.
 
@@ -42,7 +78,7 @@ ${context.content}
 
 --- KẾT QUẢ PHASE 1 ---
 Vocabularies:
-${JSON.stringify(dependencies.vocabularies, null, 2)}
+${JSON.stringify(vocabularies, null, 2)}
 
 Classroom expressions:
 ${JSON.stringify(dependencies.expressions, null, 2)}
@@ -59,6 +95,9 @@ ${JSON.stringify(dependencies.activities, null, 2)}
 6. teacher_speech_en phải tự nhiên, đúng kiến thức và giáo viên có thể nói trực tiếp trên lớp.
 7. teacher_speech_vi phải hỗ trợ chính xác cho teacher_speech_en trong cùng bước; không tách thành hai kịch bản riêng.
 8. Nội dung phải phù hợp khối ${context.grade} và mức hỗ trợ ${context.supportLevel}.
+   - A1-A2: teacher_speech_vi phải hỗ trợ chi tiết ngay sau các chỉ dẫn tiếng Anh quan trọng.
+   - B1-B2: hỗ trợ tiếng Việt cân bằng, ưu tiên khái niệm khó và bước activity dễ nhầm.
+   - C1-C2: ưu tiên tiếng Anh, chỉ dùng tiếng Việt ngắn gọn cho thuật ngữ hoặc ý khó.
 9. Chỉ trả về một JSON object hợp lệ, không Markdown, không giải thích ngoài JSON.
 
 --- JSON CONTRACT ---

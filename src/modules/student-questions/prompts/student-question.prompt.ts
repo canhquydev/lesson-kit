@@ -3,9 +3,31 @@ import { GenerationContext } from '../../../common/interfaces';
 export const STUDENT_QUESTION_SYSTEM_PROMPT =
   'You are an expert teacher who anticipates realistic student questions and writes accurate bilingual classroom answers. Return only a valid JSON object matching the requested schema.';
 
+export interface StudentQuestionTeachingScriptInput {
+  activity_name: string;
+  objective: string;
+  teacher_speech_en?: string;
+  teacher_speech_vi?: string;
+  teacher_action?: string;
+  expected_student_response?: string;
+  notes?: string;
+  step_order?: number;
+}
+
+export interface StudentQuestionActivityInput {
+  activity_name: string;
+  duration_minutes: number;
+  description?: string;
+  objective?: string;
+  instructions?: string;
+  english_instructions?: string;
+  student_task?: string;
+  expected_outcome?: string;
+}
+
 export interface StudentQuestionPromptDependencies {
-  teachingScripts: readonly unknown[];
-  activities: readonly unknown[];
+  teachingScripts: readonly StudentQuestionTeachingScriptInput[];
+  activities: readonly StudentQuestionActivityInput[];
 }
 
 function formatRetryErrors(retryErrors: readonly string[]): string {
