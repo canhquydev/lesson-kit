@@ -37,6 +37,18 @@ export class LessonConfigService {
       durations: [35, 40, 45],
       support_levels: [
         {
+          code: SupportLevel.A1,
+          name: 'A1 - Beginner',
+          description:
+            'Can understand and use familiar everyday expressions and very basic phrases. Can interact in a simple way if the other person speaks slowly and clearly.',
+        },
+        {
+          code: SupportLevel.A2,
+          name: 'A2 - Elementary',
+          description:
+            'Can understand sentences and frequently used expressions related to immediate areas. Can communicate in simple and routine tasks.',
+        },
+        {
           code: SupportLevel.B1,
           name: 'B1 - Intermediate',
           description:
@@ -53,6 +65,12 @@ export class LessonConfigService {
           name: 'C1 - Advanced',
           description:
             'Can understand a wide range of demanding, longer texts. Can express ideas fluently and spontaneously without much obvious searching for expressions.',
+        },
+        {
+          code: SupportLevel.C2,
+          name: 'C2 - Proficiency',
+          description:
+            'Can understand with ease virtually everything heard or read. Can express ideas spontaneously, very fluently and precisely.',
         },
       ],
     };
