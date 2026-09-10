@@ -5,6 +5,7 @@ import { Vocabulary, VocabularyDocument } from './schemas/vocabulary.schema';
 import { AiService } from '../ai/ai.service';
 import {
   ComponentGenerator,
+  ComponentDependencies,
   ValidationResult,
   validateAndRetry,
 } from '../../common/validators';
@@ -25,14 +26,17 @@ export class VocabulariesService
   /**
    * Sinh danh sách từ vựng chuyên ngành từ ngữ cảnh bài học
    */
-  async generate(context: GenerationContext): Promise<VocabularyDocument[]> {
+  async generate(
+    context: GenerationContext,
+    dependencies?: ComponentDependencies,
+  ): Promise<VocabularyDocument[]> {
     this.logger.log(
       `Generating vocabularies for lesson: "${context.title}" (${context.subject} Grade ${context.grade})`,
     );
 
     const rawVocabularies = await validateAndRetry<any>(
       async (previousErrors?: string[]) => {
-        const prompt = this.getPrompt(context, previousErrors);
+        const prompt = this.getPrompt(context, dependencies, previousErrors);
         const response = await this.aiService.generateJson<{
           vocabularies: any[];
         }>([
@@ -144,7 +148,21 @@ export class VocabulariesService
   /**
    * Tạo prompt chi tiết cho AI sinh từ vựng
    */
-  getPrompt(context: GenerationContext, retryErrors?: string[]): string {
+  getPrompt(
+    context: GenerationContext,
+    dependencies?: ComponentDependencies,
+    retryErrors?: string[],
+  ): string;
+  getPrompt(context: GenerationContext, retryErrors?: string[]): string;
+  getPrompt(
+    context: GenerationContext,
+    dependenciesOrErrors?: ComponentDependencies | string[],
+    retryErrors?: string[],
+  ): string {
+    const retryErrList = Array.isArray(dependenciesOrErrors)
+      ? dependenciesOrErrors
+      : retryErrors;
+
     let prompt = `Bạn là chuyên gia giảng dạy song ngữ tiếng Anh cho các môn học phổ thông tại Việt Nam.
 Hãy phân tích nội dung bài học sau đây và sinh danh sách TỪ VỰNG CHUYÊN NGÀNH TIẾNG ANH (Phase 1 Component) để giáo viên sử dụng khi dạy học bằng tiếng Anh:
 
@@ -183,10 +201,10 @@ Trả về đối tượng JSON duy nhất có cấu trúc:
 }
 `;
 
-    if (retryErrors && retryErrors.length > 0) {
+    if (retryErrList && retryErrList.length > 0) {
       prompt += `
 ⚠️ CHÚ Ý: Lần sinh trước bị lỗi validation. Bạn BẮT BUỘC phải khắc phục triệt để các lỗi sau:
-${retryErrors.map((err, i) => `${i + 1}. ${err}`).join('\n')}
+${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
 `;
     }
 
