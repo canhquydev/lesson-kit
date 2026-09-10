@@ -7,38 +7,45 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
-import { LessonKit, LessonKitDocument } from './schemas/lesson-kit.schema';
-import { CreateLessonKitDto } from './dto';
 import { LessonKitStatus } from '../../common/enums';
+import { LessonKit, LessonKitDocument } from './schemas/lesson-kit.schema';
+import { CreateLessonKitDto, LessonKitDetailResponse } from './dto';
+
+const LESSON_KIT_COMPONENTS = [
+  { name: 'vocabularies', sortField: 'sort_order' },
+  { name: 'classroom_expressions', sortField: 'sort_order' },
+  { name: 'activities', sortField: 'sort_order' },
+  { name: 'teaching_scripts', sortField: 'step_order' },
+  { name: 'student_questions', sortField: 'sort_order' },
+  { name: 'assessments', sortField: 'sort_order' },
+];
 
 @Injectable()
 export class LessonKitsService {
   private readonly logger = new Logger(LessonKitsService.name);
+  private readonly aiModelVersion: string;
 
   constructor(
     @InjectModel(LessonKit.name)
     private readonly lessonKitModel: Model<LessonKitDocument>,
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.aiModelVersion = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o';
+  }
 
-  /**
-   * Tạo Lesson Kit mới → emit event để trigger pipeline
-   */
   async create(dto: CreateLessonKitDto): Promise<LessonKitDocument> {
     const lessonKit = await this.lessonKitModel.create({
       ...dto,
       lesson_content_id: new Types.ObjectId(dto.lesson_content_id),
       status: LessonKitStatus.GENERATING,
       current_step: 'phase1',
-      ai_model_version:
-        this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o',
+      ai_model_version: this.aiModelVersion,
       request_id: new Types.ObjectId().toHexString(),
     });
 
     this.logger.log(`Created lesson kit: ${lessonKit._id}`);
 
-    // Emit event — Dev C sẽ listen event này để trigger pipeline
     this.eventEmitter.emit('lesson-kit.generate', {
       lessonKitId: lessonKit._id.toHexString(),
     });
@@ -46,58 +53,90 @@ export class LessonKitsService {
     return lessonKit;
   }
 
-  /**
-   * Danh sách tất cả Lesson Kit
-   */
-  async findAll(): Promise<LessonKitDocument[]> {
-    return this.lessonKitModel
-      .find()
-      .sort({ createdAt: -1 })
-      .exec();
+  async findAll(page: number = 1, limit: number = 10): Promise<{ data: LessonKitDocument[], total: number, page: number, limit: number }> {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.lessonKitModel
+        .find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.lessonKitModel.countDocuments().exec()
+    ]);
+    return { data, total, page, limit };
   }
 
-  /**
-   * Chi tiết 1 Lesson Kit (không populate components — sẽ query riêng)
-   */
-  async findById(id: string): Promise<LessonKitDocument> {
-    const kit = await this.lessonKitModel.findById(id).exec();
+  async findById(id: string): Promise<LessonKitDetailResponse> {
+    const kit = await this.lessonKitModel.findById(id).lean().exec();
     if (!kit) {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
     }
-    return kit;
+
+    const db = this.lessonKitModel.db;
+    const kitObjectId = kit._id;
+
+    const componentPromises = LESSON_KIT_COMPONENTS.map((comp) =>
+      db
+        .collection(comp.name)
+        .find({ lesson_kit_id: kitObjectId })
+        .sort({ [comp.sortField]: 1 })
+        .toArray()
+    );
+
+    const [
+      vocabularies,
+      classroom_expressions,
+      activities,
+      teaching_scripts,
+      student_questions,
+      assessments,
+    ] = await Promise.all(componentPromises);
+
+    return {
+      ...kit,
+      vocabularies,
+      classroom_expressions,
+      activities,
+      teaching_scripts,
+      student_questions,
+      assessments,
+    };
   }
 
-  /**
-   * Cập nhật status (Dev C pipeline gọi)
-   */
   async updateStatus(
     id: string,
     status: LessonKitStatus,
     generationTimeMs?: number,
   ): Promise<void> {
-    const updateData: any = { status };
+    const updateData: Partial<LessonKit> = { status };
     if (generationTimeMs !== undefined) {
       updateData.generation_time_ms = generationTimeMs;
     }
-    await this.lessonKitModel.findByIdAndUpdate(id, updateData).exec();
+    const result = await this.lessonKitModel.findByIdAndUpdate(id, updateData).exec();
+    if (!result) {
+      throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+    }
     this.logger.log(`Kit ${id} status → ${status}`);
   }
 
-  /**
-   * Cập nhật current_step (Dev C pipeline gọi)
-   */
   async updateCurrentStep(id: string, step: string): Promise<void> {
-    await this.lessonKitModel
+    const result = await this.lessonKitModel
       .findByIdAndUpdate(id, { current_step: step })
       .exec();
+    if (!result) {
+      throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+    }
     this.logger.log(`Kit ${id} step → ${step}`);
   }
 
-  /**
-   * Lấy trạng thái sinh (FE polling)
-   */
   async getStatus(id: string) {
-    const kit = await this.findById(id);
+    const kit = await this.lessonKitModel
+      .findById(id, 'status current_step generation_time_ms')
+      .exec();
+    if (!kit) {
+      throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+    }
     return {
       status: kit.status,
       current_step: kit.current_step,
@@ -105,32 +144,28 @@ export class LessonKitsService {
     };
   }
 
-  /**
-   * Xóa Lesson Kit + cascade xóa 6 component collections
-   */
   async delete(id: string): Promise<void> {
-    const kit = await this.findById(id);
-
-    // Cascade delete all components by lesson_kit_id
-    const componentCollections = [
-      'vocabularies',
-      'classroom_expressions',
-      'activities',
-      'teaching_scripts',
-      'student_questions',
-      'assessments',
-    ];
+    const kit = await this.lessonKitModel.findById(id).exec();
+    if (!kit) {
+      throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+    }
 
     const db = this.lessonKitModel.db;
     const kitObjectId = kit._id;
 
-    await Promise.all(
-      componentCollections.map((collection) =>
-        db.collection(collection).deleteMany({ lesson_kit_id: kitObjectId }),
-      ),
-    );
-
-    await this.lessonKitModel.findByIdAndDelete(id).exec();
-    this.logger.log(`Deleted kit ${id} and all components`);
+    const session = await db.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await Promise.all(
+          LESSON_KIT_COMPONENTS.map((comp) =>
+            db.collection(comp.name).deleteMany({ lesson_kit_id: kitObjectId }, { session }),
+          ),
+        );
+        await this.lessonKitModel.findByIdAndDelete(id).session(session).exec();
+      });
+      this.logger.log(`Deleted kit ${id} and all components`);
+    } finally {
+      await session.endSession();
+    }
   }
 }

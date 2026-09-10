@@ -6,6 +6,11 @@ import { LessonConfigModule } from './config/config.module';
 import { LessonContentsModule } from './modules/lesson-contents/lesson-contents.module';
 import { LessonKitsModule } from './modules/lesson-kits/lesson-kits.module';
 
+import { AiModule } from './modules/ai/ai.module';
+import { VocabulariesModule } from './modules/vocabularies/vocabularies.module';
+import { ClassroomExpressionsModule } from './modules/classroom-expressions/classroom-expressions.module';
+import { ActivitiesModule } from './modules/activities/activities.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -18,10 +23,11 @@ import { LessonKitsModule } from './modules/lesson-kits/lesson-kits.module';
     LessonContentsModule,
     LessonKitsModule,
 
-    // TODO: Dev B modules
-    // VocabulariesModule,
-    // ClassroomExpressionsModule,
-    // ActivitiesModule,
+    // Dev B modules (OpenAI Service & Phase 1 Components)
+    AiModule,
+    VocabulariesModule,
+    ClassroomExpressionsModule,
+    ActivitiesModule,
 
     // TODO: Dev C modules
     // TeachingScriptsModule,

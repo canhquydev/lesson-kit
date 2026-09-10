@@ -17,8 +17,13 @@ describe('LessonKitsService', () => {
   let mockDbCollection: any;
 
   beforeEach(async () => {
+    const toArrayMock = jest.fn().mockResolvedValue([]);
+    const sortMock = jest.fn().mockReturnValue({ toArray: toArrayMock });
+    const findMock = jest.fn().mockReturnValue({ sort: sortMock });
+
     mockDbCollection = {
       deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+      find: findMock,
     };
 
     mockLessonKitModel = {
@@ -101,29 +106,60 @@ describe('LessonKitsService', () => {
     it('should return list of lesson kits sorted by createdAt desc', async () => {
       const mockKits = [{ _id: '1' }, { _id: '2' }];
       const execMock = jest.fn().mockResolvedValue(mockKits);
+      const limitMock = jest.fn().mockReturnValue({ exec: execMock });
+      const skipMock = jest.fn().mockReturnValue({ limit: limitMock });
+      
       mockLessonKitModel.find.mockReturnValue({
-        sort: jest.fn().mockReturnValue({ exec: execMock }),
+        sort: jest.fn().mockReturnValue({ skip: skipMock }),
+      });
+      
+      mockLessonKitModel.countDocuments = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(2),
       });
 
       const result = await service.findAll();
-      expect(result).toEqual(mockKits);
+      expect(result).toEqual({ data: mockKits, total: 2, page: 1, limit: 10 });
     });
   });
 
   describe('findById', () => {
-    it('should return kit when found', async () => {
-      const mockKit = { _id: 'kit_123', status: LessonKitStatus.COMPLETED };
+    it('should return kit with 6 components when found', async () => {
+      const validObjectId = new Types.ObjectId();
+      const mockKit = {
+        _id: validObjectId,
+        status: LessonKitStatus.COMPLETED,
+      };
+      const mockComponents = [{ _id: 'item_1' }];
+
+      const toArrayMock = jest.fn().mockResolvedValue(mockComponents);
+      const sortMock = jest.fn().mockReturnValue({ toArray: toArrayMock });
+      mockDbCollection.find.mockReturnValue({ sort: sortMock });
+
       mockLessonKitModel.findById.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockKit),
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockKit),
+        }),
       });
 
-      const result = await service.findById('kit_123');
-      expect(result).toEqual(mockKit);
+      const result = await service.findById(validObjectId.toHexString());
+
+      expect(result).toEqual({
+        ...mockKit,
+        vocabularies: mockComponents,
+        classroom_expressions: mockComponents,
+        activities: mockComponents,
+        teaching_scripts: mockComponents,
+        student_questions: mockComponents,
+        assessments: mockComponents,
+      });
+      expect(mockLessonKitModel.db.collection).toHaveBeenCalledTimes(6);
     });
 
     it('should throw NotFoundException if not found', async () => {
       mockLessonKitModel.findById.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(null),
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
       });
 
       await expect(service.findById('non_existing')).rejects.toThrow(
@@ -191,12 +227,19 @@ describe('LessonKitsService', () => {
     it('should cascade delete 6 components and the lesson kit', async () => {
       const validObjectId = new Types.ObjectId();
       const mockKit = { _id: validObjectId };
+      const mockSession = {
+        withTransaction: jest.fn().mockImplementation(async (cb) => await cb()),
+        endSession: jest.fn(),
+      };
+      mockLessonKitModel.db.startSession = jest.fn().mockResolvedValue(mockSession);
 
       mockLessonKitModel.findById.mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockKit),
       });
+      
+      const sessionExecMock = jest.fn().mockResolvedValue(mockKit);
       mockLessonKitModel.findByIdAndDelete.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockKit),
+        session: jest.fn().mockReturnValue({ exec: sessionExecMock }),
       });
 
       await service.delete(validObjectId.toHexString());

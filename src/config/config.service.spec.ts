@@ -51,12 +51,15 @@ describe('LessonConfigService', () => {
       const result = service.getOptions();
 
       expect(result.durations).toEqual([35, 40, 45]);
-      expect(result.support_levels).toHaveLength(3);
+      expect(result.support_levels).toHaveLength(6);
 
       const codes = result.support_levels.map((s) => s.code);
+      expect(codes).toContain(SupportLevel.A1);
+      expect(codes).toContain(SupportLevel.A2);
       expect(codes).toContain(SupportLevel.B1);
       expect(codes).toContain(SupportLevel.B2);
       expect(codes).toContain(SupportLevel.C1);
+      expect(codes).toContain(SupportLevel.C2);
     });
   });
 });
