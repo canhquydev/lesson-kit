@@ -1,6 +1,4 @@
-# LessonKit AI EdTech SaaS
-
-An AI-driven platform creating bilingual lesson kits (English & Vietnamese) for high school STEM teachers.
+# Lesson Kit
 
 ---
 
