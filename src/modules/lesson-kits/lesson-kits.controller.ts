@@ -8,15 +8,22 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { LessonKitsService } from './lesson-kits.service';
 import { CreateLessonKitDto } from './dto';
 import { BaseResponseDto } from '../../common/dto';
 import { ParseMongoIdPipe } from '../../common/pipes';
+import { RegenerateService } from '../generation/regenerate.service';
 
 @Controller('api/lesson-kit')
 export class LessonKitsController {
-  constructor(private readonly lessonKitsService: LessonKitsService) {}
+  constructor(
+    private readonly lessonKitsService: LessonKitsService,
+    @Inject(forwardRef(() => RegenerateService))
+    private readonly regenerateService: RegenerateService,
+  ) {}
 
   @Post('generate')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -62,11 +69,8 @@ export class LessonKitsController {
     @Param('id', ParseMongoIdPipe) id: string,
     @Param('component') component: string,
   ) {
-    // TODO: Dev C sẽ implement RegenerateService
-    // await this.regenerateService.regenerate(id, component);
-    return BaseResponseDto.ok(
-      { lesson_kit_id: id, component, status: 'regenerated' },
-      `Đã tạo lại ${component}`,
-    );
+    const result = await this.regenerateService.regenerate(id, component);
+    return BaseResponseDto.ok(result, `Đã tạo lại ${component}`);
   }
 }
+

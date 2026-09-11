@@ -17,13 +17,7 @@ export interface CompletionOptions {
   maxRetries?: number;
 }
 
-/**
- * Service AI dùng chung cho toàn bộ hệ thống Lesson Kit Generator.
- * Nhiệm vụ:
- * - Wrapper gọi OpenAI Chat Completions API (hỗ trợ cả OpenAI gốc và DeepSeek thông qua OPENAI_BASE_URL).
- * - Luôn yêu cầu phản hồi dạng JSON có cấu trúc bằng response_format: { type: 'json_object' }.
- * - Tự động retry tối đa 3 lần với exponential backoff khi gặp lỗi mạng, timeout, mã lỗi 429 (rate limit) hoặc JSON parse fail.
- */
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -107,14 +101,13 @@ export class AiService {
 
         this.logger.warn(
           `AI request failed on attempt ${attempt}/${maxRetries}: ${error.message} ` +
-            `(rateLimit: ${isRateLimit}, network: ${isNetworkError}, jsonError: ${isJsonParseError})`,
+          `(rateLimit: ${isRateLimit}, network: ${isNetworkError}, jsonError: ${isJsonParseError})`,
         );
 
         if (attempt >= maxRetries) {
           break;
         }
 
-        // Exponential backoff: 1s, 2s, 4s...
         const delayMs = Math.pow(2, attempt - 1) * 1000;
         this.logger.log(`Waiting ${delayMs}ms before retrying AI request...`);
         await this.delay(delayMs);

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ActivitiesModule } from '../activities/activities.module';
 import { AssessmentsModule } from '../assessments/assessments.module';
 import { ClassroomExpressionsModule } from '../classroom-expressions/classroom-expressions.module';
@@ -13,7 +13,7 @@ import { RegenerateService } from './regenerate.service';
 
 @Module({
   imports: [
-    LessonKitsModule,
+    forwardRef(() => LessonKitsModule),
     LessonContentsModule,
     VocabulariesModule,
     ClassroomExpressionsModule,

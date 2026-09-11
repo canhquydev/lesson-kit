@@ -13,19 +13,15 @@ import { GenerationContext } from '../../common/interfaces';
 
 @Injectable()
 export class VocabulariesService
-  implements ComponentGenerator<VocabularyDocument>
-{
+  implements ComponentGenerator<VocabularyDocument> {
   private readonly logger = new Logger(VocabulariesService.name);
 
   constructor(
     @InjectModel(Vocabulary.name)
     private readonly vocabularyModel: Model<VocabularyDocument>,
     private readonly aiService: AiService,
-  ) {}
+  ) { }
 
-  /**
-   * Sinh danh sách từ vựng chuyên ngành từ ngữ cảnh bài học
-   */
   async generate(
     context: GenerationContext,
     dependencies?: ComponentDependencies,
@@ -58,7 +54,6 @@ export class VocabulariesService
       3,
     );
 
-    // Gán thứ tự sort_order nếu chưa có
     return rawVocabularies.map((item, index) => ({
       ...item,
       sort_order: item.sort_order ?? index + 1,
