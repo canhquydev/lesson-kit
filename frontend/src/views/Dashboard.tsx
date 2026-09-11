@@ -1,9 +1,32 @@
-import { useMemo, useRef, useState, useEffect } from "react";
-import { lessonKits } from "../data";
-import { Combobox, SubjectBadge, CefrPill, StatusBadge, Card } from "../components/ui";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { Combobox, SubjectBadge, CefrPill, StatusBadge, Card, SkeletonRow, toast } from "../components/ui";
 import { ArrowRight, Dots, Eye, Plus, Refresh, Search, Sparkle, Trash } from "../components/icons";
+import { getKitList, deleteKit } from "../lib/api";
+import type { LessonKitListItem } from "../lib/types";
 
-function RowMenu({ onView }: { onView: () => void }) {
+// Map backend subject codes → English display names
+const SUBJECT_DISPLAY: Record<string, string> = {
+  VAT_LI: "Physics",
+  HOA_HOC: "Chemistry",
+  SINH_HOC: "Biology",
+  TOAN: "Math",
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function capitalizeStatus(s: string): string {
+  if (s === "completed") return "Completed";
+  if (s === "generating") return "Generating";
+  return "Failed";
+}
+
+function RowMenu({ onView, onDelete }: { onView: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -16,8 +39,7 @@ function RowMenu({ onView }: { onView: () => void }) {
   }, [open]);
   const items = [
     { label: "View", icon: Eye, action: onView },
-    { label: "Regenerate", icon: Refresh, action: () => {} },
-    { label: "Delete", icon: Trash, action: () => {}, danger: true },
+    { label: "Delete", icon: Trash, action: onDelete, danger: true },
   ];
   return (
     <div ref={ref} className="relative flex justify-end">
@@ -57,21 +79,44 @@ export function Dashboard({
   onOpenKit: (id: string) => void;
   onCreate: () => void;
 }) {
+  const [kits, setKits] = useState<LessonKitListItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [subject, setSubject] = useState("All");
-  const [grade, setGrade] = useState("All");
   const [status, setStatus] = useState("All");
+
+  const loadKits = useCallback(() => {
+    setLoading(true);
+    getKitList(1, 50)
+      .then(setKits)
+      .catch(() => toast("Không thể tải danh sách", "error"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadKits(); }, [loadKits]);
+
+  async function handleDelete(id: string) {
+    if (!confirm("Bạn có chắc muốn xóa Lesson Kit này?")) return;
+    // Optimistic delete
+    setKits((prev) => prev.filter((k) => k._id !== id));
+    try {
+      await deleteKit(id);
+      toast("Đã xóa Lesson Kit", "success");
+    } catch {
+      toast("Xóa thất bại", "error");
+      loadKits(); // rollback
+    }
+  }
 
   const filtered = useMemo(
     () =>
-      lessonKits.filter(
+      kits.filter(
         (k) =>
-          k.title.toLowerCase().includes(q.toLowerCase()) &&
-          (subject === "All" || k.subject === subject) &&
-          (grade === "All" || k.grade === grade) &&
-          (status === "All" || k.status === status),
+          k.lesson_topic.toLowerCase().includes(q.toLowerCase()) &&
+          (subject === "All" || SUBJECT_DISPLAY[k.subject] === subject) &&
+          (status === "All" || capitalizeStatus(k.status) === status),
       ),
-    [q, subject, grade, status],
+    [kits, q, subject, status],
   );
 
   const opt = (arr: string[]) => arr.map((v) => ({ value: v, label: v }));
@@ -122,8 +167,6 @@ export function Dashboard({
         </div>
         <Combobox label="Subject" value={subject} onChange={setSubject} className="lg:w-44"
           options={opt(["All", "Physics", "Chemistry", "Biology", "Math"])} />
-        <Combobox label="Grade" value={grade} onChange={setGrade} className="lg:w-40"
-          options={opt(["All", "Grade 10", "Grade 11", "Grade 12"])} />
         <Combobox label="Status" value={status} onChange={setStatus} className="lg:w-40"
           options={opt(["All", "Completed", "Generating", "Failed"])} />
       </div>
@@ -145,32 +188,44 @@ export function Dashboard({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((k) => (
-                <tr
-                  key={k.id}
-                  onClick={() => k.status === "Completed" && onOpenKit(k.id)}
-                  className={`border-b border-slate-100 text-[13.5px] transition-colors last:border-0 ${
-                    k.status === "Completed" ? "cursor-pointer hover:bg-slate-50/70" : ""
-                  }`}
-                >
-                  <td className="px-5 py-3.5 font-medium text-slate-900">{k.title}</td>
-                  <td className="px-4 py-3.5"><SubjectBadge subject={k.subject} /></td>
-                  <td className="px-4 py-3.5 text-slate-600">{k.grade}</td>
-                  <td className="px-4 py-3.5 text-slate-600">{k.duration}</td>
-                  <td className="px-4 py-3.5"><CefrPill level={k.cefr} /></td>
-                  <td className="px-4 py-3.5 text-slate-500">{k.created}</td>
-                  <td className="px-4 py-3.5"><StatusBadge status={k.status} /></td>
-                  <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
-                    <RowMenu onView={() => onOpenKit(k.id)} />
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
+              {loading ? (
+                <>
+                  <tr><td colSpan={8}><SkeletonRow /></td></tr>
+                  <tr><td colSpan={8}><SkeletonRow /></td></tr>
+                  <tr><td colSpan={8}><SkeletonRow /></td></tr>
+                </>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-5 py-16 text-center text-[14px] text-slate-400">
-                    Không có bài giảng nào khớp với bộ lọc hiện tại.
+                    {kits.length === 0
+                      ? "Chưa có Lesson Kit nào. Bấm nút Create để tạo!"
+                      : "Không có bài giảng nào khớp với bộ lọc hiện tại."}
                   </td>
                 </tr>
+              ) : (
+                filtered.map((k) => (
+                  <tr
+                    key={k._id}
+                    onClick={() => onOpenKit(k._id)}
+                    className="cursor-pointer border-b border-slate-100 text-[13.5px] transition-colors last:border-0 hover:bg-slate-50/70"
+                  >
+                    <td className="px-5 py-3.5 font-medium text-slate-900">{k.lesson_topic}</td>
+                    <td className="px-4 py-3.5">
+                      <SubjectBadge subject={SUBJECT_DISPLAY[k.subject] || k.subject} />
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-600">Lớp {k.grade}</td>
+                    <td className="px-4 py-3.5 text-slate-600">{k.duration} phút</td>
+                    <td className="px-4 py-3.5"><CefrPill level={k.support_level} /></td>
+                    <td className="px-4 py-3.5 text-slate-500">{formatDate(k.createdAt)}</td>
+                    <td className="px-4 py-3.5"><StatusBadge status={capitalizeStatus(k.status)} /></td>
+                    <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      <RowMenu
+                        onView={() => onOpenKit(k._id)}
+                        onDelete={() => handleDelete(k._id)}
+                      />
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
