@@ -202,7 +202,7 @@ describe('LessonKitsService', () => {
   });
 
   describe('getStatus', () => {
-    it('should return status summary', async () => {
+    it('should return status summary with progress_percent', async () => {
       const mockKit = {
         _id: 'kit_123',
         status: LessonKitStatus.GENERATING,
@@ -218,8 +218,34 @@ describe('LessonKitsService', () => {
       expect(status).toEqual({
         status: LessonKitStatus.GENERATING,
         current_step: 'phase1',
+        progress_percent: 30,
         generation_time_ms: 5000,
       });
+    });
+
+    it('should return 100% when completed', async () => {
+      const mockKit = {
+        _id: 'kit_123',
+        status: LessonKitStatus.COMPLETED,
+        current_step: 'completed',
+        generation_time_ms: 80000,
+      };
+      mockLessonKitModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockKit),
+      });
+
+      const status = await service.getStatus('kit_123');
+      expect(status.progress_percent).toBe(100);
+    });
+
+    it('should throw NotFoundException if kit not found in getStatus', async () => {
+      mockLessonKitModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
+      await expect(service.getStatus('non_existing')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

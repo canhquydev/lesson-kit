@@ -130,6 +130,34 @@ export class LessonKitsService {
     this.logger.log(`Kit ${id} step → ${step}`);
   }
 
+  private calculateProgressPercent(status: LessonKitStatus, step?: string): number {
+    if (status === LessonKitStatus.COMPLETED) {
+      return 100;
+    }
+    if (status === LessonKitStatus.FAILED || status === LessonKitStatus.DRAFT) {
+      return 0;
+    }
+
+    switch (step) {
+      case 'phase1':
+      case 'phase1_vocabulary':
+      case 'phase1_expressions':
+      case 'phase1_activities':
+        return 30;
+      case 'phase2':
+      case 'phase2_script':
+        return 65;
+      case 'phase3':
+      case 'phase3_questions':
+      case 'phase3_assessment':
+        return 90;
+      case 'completed':
+        return 100;
+      default:
+        return 10;
+    }
+  }
+
   async getStatus(id: string) {
     const kit = await this.lessonKitModel
       .findById(id, 'status current_step generation_time_ms')
@@ -140,6 +168,7 @@ export class LessonKitsService {
     return {
       status: kit.status,
       current_step: kit.current_step,
+      progress_percent: this.calculateProgressPercent(kit.status, kit.current_step),
       generation_time_ms: kit.generation_time_ms,
     };
   }
