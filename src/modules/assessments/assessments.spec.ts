@@ -209,6 +209,30 @@ describe('Assessments Day 1 artifacts', () => {
           ),
         ).toBe(false);
       });
+
+      it('validates matching answers in numbered-to-letter format', () => {
+        expect(
+          hasValidAssessmentCorrectAnswer(
+            AssessmentQuestionType.MATCHING,
+            '1-b, 2-a',
+            [],
+          ),
+        ).toBe(true);
+        expect(
+          hasValidAssessmentCorrectAnswer(
+            AssessmentQuestionType.MATCHING,
+            'Force = ma',
+            [],
+          ),
+        ).toBe(false);
+        expect(
+          hasValidAssessmentCorrectAnswer(
+            AssessmentQuestionType.MATCHING,
+            '1-a, 2-a',
+            [],
+          ),
+        ).toBe(false);
+      });
     });
   });
 
@@ -256,7 +280,7 @@ describe('Assessments Day 1 artifacts', () => {
         question_text: 'Match the law to its description.',
         question_type: AssessmentQuestionType.MATCHING,
         options: [],
-        correct_answer: 'Force = ma',
+        correct_answer: '1-b, 2-a',
         explanation: 'Match by definition.',
         sort_order: 3,
       });

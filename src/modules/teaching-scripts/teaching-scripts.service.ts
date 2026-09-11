@@ -44,20 +44,14 @@ interface TeachingScriptResponse {
 /**
  * Dev C — Teaching Scripts Service
  *
- * Implements ComponentGenerator<TeachingScript> (plain domain object, not
- * HydratedDocument). Persistence methods return TeachingScriptDocument[].
- *
- * External contract gap (Dev A/B):
- *   ComponentGenerator<T>.generate(context) has only one parameter.
- *   We add an optional second parameter; TypeScript still satisfies the
- *   interface because optional extras don't violate structural compatibility
- *   when the caller uses a typed reference.
- *   The Task Assignment pipeline is expected to call:
- *     scriptService.generate(context, { vocab, expressions, activities })
- *   which aligns with our extended signature.
+ * Implements the shared ComponentGenerator contract with the Phase 2
+ * dependency shape. Persistence methods return TeachingScriptDocument[].
  */
 @Injectable()
-export class TeachingScriptsService implements ComponentGenerator<TeachingScript> {
+export class TeachingScriptsService implements ComponentGenerator<
+  TeachingScript,
+  TeachingScriptPromptDependencies
+> {
   private readonly logger = new Logger(TeachingScriptsService.name);
 
   constructor(
@@ -184,13 +178,25 @@ export class TeachingScriptsService implements ComponentGenerator<TeachingScript
 
   getPrompt(
     context: GenerationContext,
-    retryErrors: string[] = [],
     dependencies?: TeachingScriptPromptDependencies,
+    retryErrors?: string[],
+  ): string;
+  getPrompt(context: GenerationContext, retryErrors?: string[]): string;
+  getPrompt(
+    context: GenerationContext,
+    dependenciesOrErrors?: TeachingScriptPromptDependencies | string[],
+    retryErrors: string[] = [],
   ): string {
+    const dependencies = Array.isArray(dependenciesOrErrors)
+      ? undefined
+      : dependenciesOrErrors;
+    const errors = Array.isArray(dependenciesOrErrors)
+      ? dependenciesOrErrors
+      : retryErrors;
     const resolved = dependencies
       ? this.resolveDependencies(dependencies)
       : { vocabularies: [], expressions: [], activities: [] };
-    return buildTeachingScriptPrompt(context, resolved, retryErrors);
+    return buildTeachingScriptPrompt(context, resolved, errors);
   }
 
   // -------------------------------------------------------------------------

@@ -41,7 +41,7 @@ class AssessmentCorrectAnswerConstraint implements ValidatorConstraintInterface 
   }
 
   defaultMessage(): string {
-    return 'correct_answer must match one option for multiple_choice and must be "True" or "False" for true_false';
+    return 'correct_answer must match one option for multiple_choice, be "True" or "False" for true_false, and use the format "1-b, 2-a" for matching';
   }
 }
 

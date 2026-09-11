@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { LessonKitStatus } from '../../common/enums';
@@ -80,6 +81,7 @@ describe('GenerationService', () => {
 
   let lessonKitsService: {
     findById: jest.Mock;
+    getStatus: jest.Mock;
     updateStatus: jest.Mock;
     updateCurrentStep: jest.Mock;
   };
@@ -116,6 +118,10 @@ describe('GenerationService', () => {
 
     lessonKitsService = {
       findById: jest.fn().mockResolvedValue(mockLessonKit),
+      getStatus: jest.fn().mockResolvedValue({
+        status: LessonKitStatus.GENERATING,
+        current_step: 'phase1',
+      }),
       updateStatus: jest.fn().mockResolvedValue(undefined),
       updateCurrentStep: jest.fn().mockResolvedValue(undefined),
     };
@@ -190,6 +196,47 @@ describe('GenerationService', () => {
         service.handleLessonKitGenerate({ lessonKitId: kitId }),
       ).resolves.not.toThrow();
     });
+
+    it('is invoked exactly once by the lesson-kit.generate event', async () => {
+      const eventModule = await Test.createTestingModule({
+        imports: [EventEmitterModule.forRoot()],
+        providers: [
+          GenerationService,
+          { provide: LessonKitsService, useValue: lessonKitsService },
+          { provide: LessonContentsService, useValue: lessonContentsService },
+          { provide: VocabulariesService, useValue: vocabulariesService },
+          {
+            provide: ClassroomExpressionsService,
+            useValue: classroomExpressionsService,
+          },
+          { provide: ActivitiesService, useValue: activitiesService },
+          { provide: TeachingScriptsService, useValue: teachingScriptsService },
+          {
+            provide: StudentQuestionsService,
+            useValue: studentQuestionsService,
+          },
+          { provide: AssessmentsService, useValue: assessmentsService },
+        ],
+      }).compile();
+      const app = eventModule.createNestApplication();
+      await app.init();
+
+      try {
+        const eventService = app.get(GenerationService);
+        const generateSpy = jest
+          .spyOn(eventService, 'generateLessonKit')
+          .mockResolvedValueOnce();
+
+        await app.get(EventEmitter2).emitAsync('lesson-kit.generate', {
+          lessonKitId: kitId,
+        });
+
+        expect(generateSpy).toHaveBeenCalledTimes(1);
+        expect(generateSpy).toHaveBeenCalledWith(kitId);
+      } finally {
+        await app.close();
+      }
+    });
   });
 
   describe('generateLessonKit', () => {
@@ -220,7 +267,7 @@ describe('GenerationService', () => {
       // 3. Phase 2
       expect(lessonKitsService.updateCurrentStep).toHaveBeenCalledWith(
         kitId,
-        'phase2',
+        'phase2_script',
       );
       expect(teachingScriptsService.generate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -267,6 +314,22 @@ describe('GenerationService', () => {
         mockAssessments,
       );
 
+      expect(
+        lessonKitsService.updateCurrentStep.mock.calls.map(
+          ([, step]: [string, string]) => step,
+        ),
+      ).toEqual([
+        'phase1',
+        'phase1_vocabulary',
+        'phase1_expressions',
+        'phase1_activities',
+        'phase2_script',
+        'phase3',
+        'phase3_questions',
+        'phase3_assessment',
+        'completed',
+      ]);
+
       // 5. Completion
       expect(lessonKitsService.updateCurrentStep).toHaveBeenCalledWith(
         kitId,
@@ -292,11 +355,11 @@ describe('GenerationService', () => {
       );
       expect(lessonKitsService.updateCurrentStep).toHaveBeenCalledWith(
         kitId,
-        'phase1_failed',
+        'phase1',
       );
     });
 
-    it('throws and sets phase2_failed status when Phase 2 generation throws', async () => {
+    it('throws and records phase2_script when Phase 2 generation fails', async () => {
       teachingScriptsService.generate.mockRejectedValueOnce(
         new Error('Phase 2 AI generation failed'),
       );
@@ -311,11 +374,31 @@ describe('GenerationService', () => {
       );
       expect(lessonKitsService.updateCurrentStep).toHaveBeenCalledWith(
         kitId,
-        'phase2_failed',
+        'phase2_script',
       );
     });
 
-    it('throws and sets phase3_failed status when Phase 3 generation throws', async () => {
+    it('records the exact failed Phase 1 component and skips Phase 2', async () => {
+      classroomExpressionsService.generate.mockRejectedValueOnce(
+        new Error('Phase 1 expressions failed'),
+      );
+
+      await expect(service.generateLessonKit(kitId)).rejects.toThrow(
+        'Phase 1 expressions failed',
+      );
+
+      expect(lessonKitsService.updateCurrentStep).toHaveBeenCalledWith(
+        kitId,
+        'phase1_expressions',
+      );
+      expect(lessonKitsService.updateStatus).toHaveBeenCalledWith(
+        kitId,
+        LessonKitStatus.FAILED,
+      );
+      expect(teachingScriptsService.generate).not.toHaveBeenCalled();
+    });
+
+    it('throws and records the failed Phase 3 component', async () => {
       assessmentsService.generate.mockRejectedValueOnce(
         new Error('Phase 3 assessment failed'),
       );
@@ -330,8 +413,144 @@ describe('GenerationService', () => {
       );
       expect(lessonKitsService.updateCurrentStep).toHaveBeenCalledWith(
         kitId,
-        'phase3_failed',
+        'phase3_assessment',
+      );
+    });
+
+    it('stops before Phase 2 when the kit is no longer generating', async () => {
+      lessonKitsService.getStatus.mockResolvedValueOnce({
+        status: LessonKitStatus.COMPLETED,
+        current_step: 'completed',
+      });
+
+      await service.generateLessonKit(kitId);
+
+      expect(teachingScriptsService.generate).not.toHaveBeenCalled();
+      expect(lessonKitsService.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('starts every Phase 1 generator before waiting for any result', async () => {
+      const vocabDeferred = createDeferred<typeof mockVocab>();
+      const expressionsDeferred = createDeferred<typeof mockExpressions>();
+      const activitiesDeferred = createDeferred<typeof mockActivities>();
+      vocabulariesService.generate.mockReturnValueOnce(vocabDeferred.promise);
+      classroomExpressionsService.generate.mockReturnValueOnce(
+        expressionsDeferred.promise,
+      );
+      activitiesService.generate.mockReturnValueOnce(
+        activitiesDeferred.promise,
+      );
+
+      const pipeline = service.generateLessonKit(kitId);
+      await flushPromises();
+
+      expect(vocabulariesService.generate).toHaveBeenCalledTimes(1);
+      expect(classroomExpressionsService.generate).toHaveBeenCalledTimes(1);
+      expect(activitiesService.generate).toHaveBeenCalledTimes(1);
+      expect(teachingScriptsService.generate).not.toHaveBeenCalled();
+
+      vocabDeferred.resolve(mockVocab);
+      expressionsDeferred.resolve(mockExpressions);
+      activitiesDeferred.resolve(mockActivities);
+      await pipeline;
+
+      expect(teachingScriptsService.generate).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports parallel Phase 1 saves in stable progress order', async () => {
+      const vocabularySave = createDeferred<typeof mockVocab>();
+      vocabulariesService.saveBulk.mockReturnValueOnce(vocabularySave.promise);
+
+      const pipeline = service.generateLessonKit(kitId);
+      await flushPromises();
+
+      expect(
+        lessonKitsService.updateCurrentStep.mock.calls.map(
+          ([, step]: [string, string]) => step,
+        ),
+      ).toEqual(['phase1']);
+
+      vocabularySave.resolve(mockVocab);
+      await pipeline;
+
+      const reportedSteps = lessonKitsService.updateCurrentStep.mock.calls.map(
+        ([, step]: [string, string]) => step,
+      );
+      expect(reportedSteps.indexOf('phase1_vocabulary')).toBeLessThan(
+        reportedSteps.indexOf('phase1_expressions'),
+      );
+      expect(reportedSteps.indexOf('phase1_expressions')).toBeLessThan(
+        reportedSteps.indexOf('phase1_activities'),
+      );
+    });
+
+    it('waits for parallel saves before recording a stable failure step', async () => {
+      const activitySave = createDeferred<typeof mockActivities>();
+      classroomExpressionsService.saveBulk.mockRejectedValueOnce(
+        new Error('Expression persistence failed'),
+      );
+      activitiesService.saveBulk.mockReturnValueOnce(activitySave.promise);
+
+      const pipeline = service.generateLessonKit(kitId);
+      await flushPromises();
+
+      expect(lessonKitsService.updateStatus).not.toHaveBeenCalled();
+
+      activitySave.resolve(mockActivities);
+      await expect(pipeline).rejects.toThrow('Expression persistence failed');
+
+      const reportedSteps = lessonKitsService.updateCurrentStep.mock.calls.map(
+        ([, step]: [string, string]) => step,
+      );
+      expect(reportedSteps.at(-1)).toBe('phase1_expressions');
+      expect(teachingScriptsService.generate).not.toHaveBeenCalled();
+    });
+
+    it('starts both Phase 3 generators before waiting for either result', async () => {
+      const questionsDeferred = createDeferred<typeof mockQuestions>();
+      const assessmentsDeferred = createDeferred<typeof mockAssessments>();
+      studentQuestionsService.generate.mockReturnValueOnce(
+        questionsDeferred.promise,
+      );
+      assessmentsService.generate.mockReturnValueOnce(
+        assessmentsDeferred.promise,
+      );
+
+      const pipeline = service.generateLessonKit(kitId);
+      await flushPromises();
+
+      expect(studentQuestionsService.generate).toHaveBeenCalledTimes(1);
+      expect(assessmentsService.generate).toHaveBeenCalledTimes(1);
+      expect(studentQuestionsService.saveBulk).not.toHaveBeenCalled();
+      expect(assessmentsService.saveBulk).not.toHaveBeenCalled();
+
+      questionsDeferred.resolve(mockQuestions);
+      assessmentsDeferred.resolve(mockAssessments);
+      await pipeline;
+
+      expect(studentQuestionsService.saveBulk).toHaveBeenCalledWith(
+        kitId,
+        mockQuestions,
+      );
+      expect(assessmentsService.saveBulk).toHaveBeenCalledWith(
+        kitId,
+        mockAssessments,
       );
     });
   });
 });
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}

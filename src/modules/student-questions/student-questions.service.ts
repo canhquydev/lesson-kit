@@ -35,19 +35,14 @@ interface StudentQuestionResponse {
 /**
  * Dev C — Student Questions Service
  *
- * Implements ComponentGenerator<StudentQuestion> (plain domain object).
- * Persistence methods return StudentQuestionDocument[].
- *
- * External contract gap (Dev A/B):
- *   ComponentGenerator<T>.generate(context) has only one parameter.
- *   We add an optional second parameter; TypeScript still satisfies the
- *   interface because optional extras don't violate structural compatibility.
- *
- * Supports both object-style and positional dependency calls:
- *   service.generate(context, { teachingScripts, activities })
+ * Implements the shared ComponentGenerator contract with the Phase 3
+ * dependency shape. Persistence methods return StudentQuestionDocument[].
  */
 @Injectable()
-export class StudentQuestionsService implements ComponentGenerator<StudentQuestion> {
+export class StudentQuestionsService implements ComponentGenerator<
+  StudentQuestion,
+  StudentQuestionPromptDependencies
+> {
   private readonly logger = new Logger(StudentQuestionsService.name);
 
   constructor(
@@ -162,13 +157,25 @@ export class StudentQuestionsService implements ComponentGenerator<StudentQuesti
 
   getPrompt(
     context: GenerationContext,
-    retryErrors: string[] = [],
     dependencies?: StudentQuestionPromptDependencies,
+    retryErrors?: string[],
+  ): string;
+  getPrompt(context: GenerationContext, retryErrors?: string[]): string;
+  getPrompt(
+    context: GenerationContext,
+    dependenciesOrErrors?: StudentQuestionPromptDependencies | string[],
+    retryErrors: string[] = [],
   ): string {
+    const dependencies = Array.isArray(dependenciesOrErrors)
+      ? undefined
+      : dependenciesOrErrors;
+    const errors = Array.isArray(dependenciesOrErrors)
+      ? dependenciesOrErrors
+      : retryErrors;
     const resolved = dependencies
       ? this.resolveDependencies(dependencies)
       : { teachingScripts: [], activities: [] };
-    return buildStudentQuestionPrompt(context, resolved, retryErrors);
+    return buildStudentQuestionPrompt(context, resolved, errors);
   }
 
   // -------------------------------------------------------------------------

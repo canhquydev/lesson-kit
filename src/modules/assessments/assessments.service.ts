@@ -37,19 +37,14 @@ interface AssessmentResponse {
 /**
  * Dev C — Assessments Service
  *
- * Implements ComponentGenerator<Assessment> (plain domain object).
- * Persistence methods return AssessmentDocument[].
- *
- * External contract gap (Dev A/B):
- *   ComponentGenerator<T>.generate(context) has only one parameter.
- *   We add an optional second parameter; TypeScript still satisfies the
- *   interface because optional extras don't violate structural compatibility.
- *
- * Supports both object-style and positional dependency calls:
- *   service.generate(context, { teachingScripts, activities })
+ * Implements the shared ComponentGenerator contract with the Phase 3
+ * dependency shape. Persistence methods return AssessmentDocument[].
  */
 @Injectable()
-export class AssessmentsService implements ComponentGenerator<Assessment> {
+export class AssessmentsService implements ComponentGenerator<
+  Assessment,
+  AssessmentPromptDependencies
+> {
   private readonly logger = new Logger(AssessmentsService.name);
 
   constructor(
@@ -198,13 +193,25 @@ export class AssessmentsService implements ComponentGenerator<Assessment> {
 
   getPrompt(
     context: GenerationContext,
-    retryErrors: string[] = [],
     dependencies?: AssessmentPromptDependencies,
+    retryErrors?: string[],
+  ): string;
+  getPrompt(context: GenerationContext, retryErrors?: string[]): string;
+  getPrompt(
+    context: GenerationContext,
+    dependenciesOrErrors?: AssessmentPromptDependencies | string[],
+    retryErrors: string[] = [],
   ): string {
+    const dependencies = Array.isArray(dependenciesOrErrors)
+      ? undefined
+      : dependenciesOrErrors;
+    const errors = Array.isArray(dependenciesOrErrors)
+      ? dependenciesOrErrors
+      : retryErrors;
     const resolved = dependencies
       ? this.resolveDependencies(dependencies)
       : { teachingScripts: [], activities: [] };
-    return buildAssessmentPrompt(context, resolved, retryErrors);
+    return buildAssessmentPrompt(context, resolved, errors);
   }
 
   // -------------------------------------------------------------------------

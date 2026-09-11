@@ -11,6 +11,23 @@ import { StudentQuestionsService } from '../student-questions/student-questions.
 import { TeachingScriptsService } from '../teaching-scripts/teaching-scripts.service';
 import { VocabulariesService } from '../vocabularies/vocabularies.service';
 
+class PipelineStepError extends Error {
+  constructor(
+    readonly step: string,
+    readonly originalError: unknown,
+  ) {
+    super(
+      originalError instanceof Error
+        ? originalError.message
+        : String(originalError),
+    );
+    this.name = PipelineStepError.name;
+    if (originalError instanceof Error) {
+      this.stack = originalError.stack;
+    }
+  }
+}
+
 /**
  * Dev C — GenerationService (Pipeline Orchestration)
  *
@@ -46,7 +63,7 @@ export class GenerationService {
 
     try {
       await this.generateLessonKit(payload.lessonKitId);
-    } catch (error) {
+    } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
@@ -67,6 +84,12 @@ export class GenerationService {
         throw new NotFoundException(
           `Lesson Kit with ID "${lessonKitId}" not found`,
         );
+      }
+      if (kit.status !== LessonKitStatus.GENERATING) {
+        this.logger.warn(
+          `[Kit: ${lessonKitId}] Ignored generation event because status is "${kit.status}"`,
+        );
+        return;
       }
 
       // 2. Load Lesson Content
@@ -94,37 +117,78 @@ export class GenerationService {
       // Phase 1: Run in parallel (vocabularies, expressions, activities)
       // -----------------------------------------------------------------------
       currentStep = 'phase1';
+      await this.lessonKitsService.updateCurrentStep(lessonKitId, currentStep);
       this.logger.log(`[Kit: ${lessonKitId}] Phase 1 started (parallel)`);
 
       const [vocab, expressions, activities] = await Promise.all([
-        this.vocabulariesService.generate(context),
-        this.classroomExpressionsService.generate(context),
-        this.activitiesService.generate(context),
+        this.runStep('phase1_vocabulary', () =>
+          this.vocabulariesService.generate(context),
+        ),
+        this.runStep('phase1_expressions', () =>
+          this.classroomExpressionsService.generate(context),
+        ),
+        this.runStep('phase1_activities', () =>
+          this.activitiesService.generate(context),
+        ),
       ]);
 
-      await Promise.all([
-        this.vocabulariesService.saveBulk(lessonKitId, vocab),
-        this.classroomExpressionsService.saveBulk(lessonKitId, expressions),
-        this.activitiesService.saveBulk(lessonKitId, activities),
+      const markPhase1Complete = this.createOrderedProgressTracker(
+        lessonKitId,
+        ['phase1_vocabulary', 'phase1_expressions', 'phase1_activities'],
+      );
+      await this.waitForParallelTasks([
+        this.runStep('phase1_vocabulary', () =>
+          this.saveAndTrack(
+            () => this.vocabulariesService.saveBulk(lessonKitId, vocab),
+            () => markPhase1Complete('phase1_vocabulary'),
+          ),
+        ),
+        this.runStep('phase1_expressions', () =>
+          this.saveAndTrack(
+            () =>
+              this.classroomExpressionsService.saveBulk(
+                lessonKitId,
+                expressions,
+              ),
+            () => markPhase1Complete('phase1_expressions'),
+          ),
+        ),
+        this.runStep('phase1_activities', () =>
+          this.saveAndTrack(
+            () => this.activitiesService.saveBulk(lessonKitId, activities),
+            () => markPhase1Complete('phase1_activities'),
+          ),
+        ),
       ]);
+
+      if (!(await this.isStillGenerating(lessonKitId))) {
+        return;
+      }
 
       // -----------------------------------------------------------------------
       // Phase 2: Teaching Scripts (depends on Phase 1)
       // -----------------------------------------------------------------------
-      currentStep = 'phase2';
-      await this.lessonKitsService.updateCurrentStep(lessonKitId, 'phase2');
+      currentStep = 'phase2_script';
+      await this.lessonKitsService.updateCurrentStep(lessonKitId, currentStep);
       this.logger.log(
         `[Kit: ${lessonKitId}] Phase 2 started (teaching scripts)`,
       );
 
-      const scripts = await this.teachingScriptsService.generate(context, {
-        vocabularies: vocab,
-        vocab,
-        expressions,
-        activities,
-      });
+      const scripts = await this.runStep(currentStep, () =>
+        this.teachingScriptsService.generate(context, {
+          vocabularies: vocab,
+          expressions,
+          activities,
+        }),
+      );
 
-      await this.teachingScriptsService.saveBulk(lessonKitId, scripts);
+      await this.runStep(currentStep, () =>
+        this.teachingScriptsService.saveBulk(lessonKitId, scripts),
+      );
+
+      if (!(await this.isStillGenerating(lessonKitId))) {
+        return;
+      }
 
       // -----------------------------------------------------------------------
       // Phase 3: Run in parallel (student questions, assessments)
@@ -136,28 +200,36 @@ export class GenerationService {
       );
 
       const [questions, assessments] = await Promise.all([
-        this.studentQuestionsService.generate(context, {
-          teachingScripts: scripts,
-          activities,
-        }),
-        this.assessmentsService.generate(context, {
-          teachingScripts: scripts,
-          activities,
-        }),
+        this.runStep('phase3_questions', () =>
+          this.studentQuestionsService.generate(context, {
+            teachingScripts: scripts,
+            activities,
+          }),
+        ),
+        this.runStep('phase3_assessment', () =>
+          this.assessmentsService.generate(context, {
+            teachingScripts: scripts,
+            activities,
+          }),
+        ),
       ]);
 
-      await Promise.all([
-        this.studentQuestionsService.saveBulk(
-          lessonKitId,
-          questions as unknown as Parameters<
-            StudentQuestionsService['saveBulk']
-          >[1],
+      const markPhase3Complete = this.createOrderedProgressTracker(
+        lessonKitId,
+        ['phase3_questions', 'phase3_assessment'],
+      );
+      await this.waitForParallelTasks([
+        this.runStep('phase3_questions', () =>
+          this.saveAndTrack(
+            () => this.studentQuestionsService.saveBulk(lessonKitId, questions),
+            () => markPhase3Complete('phase3_questions'),
+          ),
         ),
-        this.assessmentsService.saveBulk(
-          lessonKitId,
-          assessments as unknown as Parameters<
-            AssessmentsService['saveBulk']
-          >[1],
+        this.runStep('phase3_assessment', () =>
+          this.saveAndTrack(
+            () => this.assessmentsService.saveBulk(lessonKitId, assessments),
+            () => markPhase3Complete('phase3_assessment'),
+          ),
         ),
       ]);
 
@@ -175,19 +247,24 @@ export class GenerationService {
       this.logger.log(
         `[Kit: ${lessonKitId}] Pipeline completed in ${generationTimeMs}ms`,
       );
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : undefined;
+    } catch (error: unknown) {
+      const failedStep =
+        error instanceof PipelineStepError ? error.step : currentStep;
+      const originalError =
+        error instanceof PipelineStepError ? error.originalError : error;
+      const msg =
+        originalError instanceof Error
+          ? originalError.message
+          : String(originalError);
+      const stack =
+        originalError instanceof Error ? originalError.stack : undefined;
       this.logger.error(
-        `[Kit: ${lessonKitId}] Pipeline failed at ${currentStep}: ${msg}`,
+        `[Kit: ${lessonKitId}] Pipeline failed at ${failedStep}: ${msg}`,
         stack,
       );
 
       try {
-        await this.lessonKitsService.updateCurrentStep(
-          lessonKitId,
-          `${currentStep}_failed`,
-        );
+        await this.lessonKitsService.updateCurrentStep(lessonKitId, failedStep);
         await this.lessonKitsService.updateStatus(
           lessonKitId,
           LessonKitStatus.FAILED,
@@ -202,6 +279,89 @@ export class GenerationService {
         );
       }
 
+      throw originalError;
+    }
+  }
+
+  private async runStep<T>(step: string, task: () => Promise<T>): Promise<T> {
+    try {
+      return await task();
+    } catch (error: unknown) {
+      throw new PipelineStepError(step, error);
+    }
+  }
+
+  private async saveAndTrack<T>(
+    save: () => Promise<T>,
+    markComplete: () => Promise<void>,
+  ): Promise<T> {
+    const result = await save();
+    await markComplete();
+    return result;
+  }
+
+  private createOrderedProgressTracker(
+    lessonKitId: string,
+    orderedSteps: readonly string[],
+  ): (completedStep: string) => Promise<void> {
+    const completedSteps = new Set<string>();
+    let nextStepIndex = 0;
+    let updateQueue = Promise.resolve();
+
+    return (completedStep: string): Promise<void> => {
+      completedSteps.add(completedStep);
+      updateQueue = updateQueue.then(async () => {
+        while (
+          nextStepIndex < orderedSteps.length &&
+          completedSteps.has(orderedSteps[nextStepIndex])
+        ) {
+          const nextStep = orderedSteps[nextStepIndex];
+          await this.lessonKitsService.updateCurrentStep(lessonKitId, nextStep);
+          nextStepIndex += 1;
+        }
+      });
+
+      return updateQueue;
+    };
+  }
+
+  private async waitForParallelTasks(
+    tasks: readonly Promise<unknown>[],
+  ): Promise<void> {
+    const settled = await Promise.all(
+      tasks.map(async (task) => {
+        try {
+          await task;
+          return { succeeded: true } as const;
+        } catch (error: unknown) {
+          return { succeeded: false, error } as const;
+        }
+      }),
+    );
+
+    const failure = settled.find((result) => !result.succeeded);
+    if (failure && !failure.succeeded) {
+      throw failure.error;
+    }
+  }
+
+  private async isStillGenerating(lessonKitId: string): Promise<boolean> {
+    try {
+      const { status } = await this.lessonKitsService.getStatus(lessonKitId);
+      if (status !== LessonKitStatus.GENERATING) {
+        this.logger.warn(
+          `[Kit: ${lessonKitId}] Pipeline stopped because status is "${status}"`,
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        this.logger.warn(
+          `[Kit: ${lessonKitId}] Pipeline stopped because the kit was deleted`,
+        );
+        return false;
+      }
       throw error;
     }
   }

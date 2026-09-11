@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { ComponentType, LessonKitStatus } from '../../common/enums';
@@ -10,6 +14,7 @@ import { LessonKitsService } from '../lesson-kits/lesson-kits.service';
 import { StudentQuestionsService } from '../student-questions/student-questions.service';
 import { TeachingScriptsService } from '../teaching-scripts/teaching-scripts.service';
 import { VocabulariesService } from '../vocabularies/vocabularies.service';
+import { RegenerationPersistenceService } from './regeneration-persistence.service';
 import { RegenerateService } from './regenerate.service';
 
 describe('RegenerateService', () => {
@@ -94,6 +99,7 @@ describe('RegenerateService', () => {
     saveBulk: jest.Mock;
     findByKitId: jest.Mock;
   };
+  let persistenceService: { replaceComponent: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -140,6 +146,22 @@ describe('RegenerateService', () => {
       saveBulk: jest.fn().mockResolvedValue(mockAssessments),
       findByKitId: jest.fn().mockResolvedValue(mockAssessments),
     };
+    persistenceService = {
+      replaceComponent: jest
+        .fn()
+        .mockImplementation(
+          (
+            _id: string,
+            _component: ComponentType,
+            data: unknown[],
+            downstream: ComponentType[],
+          ) =>
+            Promise.resolve({
+              data,
+              staleComponents: downstream,
+            }),
+        ),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -158,6 +180,10 @@ describe('RegenerateService', () => {
           useValue: studentQuestionsService,
         },
         { provide: AssessmentsService, useValue: assessmentsService },
+        {
+          provide: RegenerationPersistenceService,
+          useValue: persistenceService,
+        },
       ],
     }).compile();
 
@@ -205,6 +231,21 @@ describe('RegenerateService', () => {
     });
   });
 
+  describe('state guard', () => {
+    it('rejects regenerate while the lesson kit is not completed', async () => {
+      lessonKitsService.findById.mockResolvedValueOnce({
+        ...mockLessonKit,
+        status: LessonKitStatus.GENERATING,
+      });
+
+      await expect(
+        service.regenerate(kitId, ComponentType.VOCABULARY),
+      ).rejects.toThrow(ConflictException);
+      expect(vocabulariesService.generate).not.toHaveBeenCalled();
+      expect(persistenceService.replaceComponent).not.toHaveBeenCalled();
+    });
+  });
+
   describe('stale-marking matrix', () => {
     it('marks script, questions, assessment as stale when vocabulary is regenerated', async () => {
       const result = await service.regenerate(kitId, 'vocabulary');
@@ -214,12 +255,17 @@ describe('RegenerateService', () => {
         ComponentType.QUESTIONS,
         ComponentType.ASSESSMENT,
       ]);
-      expect(vocabulariesService.generate).toHaveBeenCalled();
-      expect(vocabulariesService.deleteByKitId).toHaveBeenCalledWith(kitId);
-      expect(vocabulariesService.saveBulk).toHaveBeenCalledWith(
+      expect(persistenceService.replaceComponent).toHaveBeenCalledWith(
         kitId,
+        ComponentType.VOCABULARY,
         mockVocab,
+        [
+          ComponentType.SCRIPT,
+          ComponentType.QUESTIONS,
+          ComponentType.ASSESSMENT,
+        ],
       );
+      expect(vocabulariesService.generate).toHaveBeenCalled();
     });
 
     it('marks script, questions, assessment as stale when expressions is regenerated', async () => {
@@ -230,12 +276,15 @@ describe('RegenerateService', () => {
         ComponentType.QUESTIONS,
         ComponentType.ASSESSMENT,
       ]);
-      expect(classroomExpressionsService.deleteByKitId).toHaveBeenCalledWith(
+      expect(persistenceService.replaceComponent).toHaveBeenCalledWith(
         kitId,
-      );
-      expect(classroomExpressionsService.saveBulk).toHaveBeenCalledWith(
-        kitId,
+        ComponentType.EXPRESSIONS,
         mockExpressions,
+        [
+          ComponentType.SCRIPT,
+          ComponentType.QUESTIONS,
+          ComponentType.ASSESSMENT,
+        ],
       );
     });
 
@@ -247,10 +296,15 @@ describe('RegenerateService', () => {
         ComponentType.QUESTIONS,
         ComponentType.ASSESSMENT,
       ]);
-      expect(activitiesService.deleteByKitId).toHaveBeenCalledWith(kitId);
-      expect(activitiesService.saveBulk).toHaveBeenCalledWith(
+      expect(persistenceService.replaceComponent).toHaveBeenCalledWith(
         kitId,
+        ComponentType.ACTIVITIES,
         mockActivities,
+        [
+          ComponentType.SCRIPT,
+          ComponentType.QUESTIONS,
+          ComponentType.ASSESSMENT,
+        ],
       );
     });
 
@@ -266,10 +320,11 @@ describe('RegenerateService', () => {
         kitId,
       );
       expect(activitiesService.findByKitId).toHaveBeenCalledWith(kitId);
-      expect(teachingScriptsService.deleteByKitId).toHaveBeenCalledWith(kitId);
-      expect(teachingScriptsService.saveBulk).toHaveBeenCalledWith(
+      expect(persistenceService.replaceComponent).toHaveBeenCalledWith(
         kitId,
+        ComponentType.SCRIPT,
         mockScripts,
+        [ComponentType.QUESTIONS, ComponentType.ASSESSMENT],
       );
     });
 
@@ -277,10 +332,11 @@ describe('RegenerateService', () => {
       const result = await service.regenerate(kitId, 'questions');
 
       expect(result.stale_components).toEqual([]);
-      expect(studentQuestionsService.deleteByKitId).toHaveBeenCalledWith(kitId);
-      expect(studentQuestionsService.saveBulk).toHaveBeenCalledWith(
+      expect(persistenceService.replaceComponent).toHaveBeenCalledWith(
         kitId,
+        ComponentType.QUESTIONS,
         mockQuestions,
+        [],
       );
     });
 
@@ -288,10 +344,11 @@ describe('RegenerateService', () => {
       const result = await service.regenerate(kitId, 'assessment');
 
       expect(result.stale_components).toEqual([]);
-      expect(assessmentsService.deleteByKitId).toHaveBeenCalledWith(kitId);
-      expect(assessmentsService.saveBulk).toHaveBeenCalledWith(
+      expect(persistenceService.replaceComponent).toHaveBeenCalledWith(
         kitId,
+        ComponentType.ASSESSMENT,
         mockAssessments,
+        [],
       );
     });
   });
@@ -305,27 +362,83 @@ describe('RegenerateService', () => {
       );
     });
 
-    it('throws BadRequestException when regenerating script without Phase 1 dependencies in DB', async () => {
-      vocabulariesService.findByKitId.mockResolvedValueOnce([]); // empty
+    // SCRIPT: each dependency individually missing must throw
+    it('throws BadRequestException when regenerating script without vocab in DB', async () => {
+      vocabulariesService.findByKitId.mockResolvedValueOnce([]); // vocab empty; expressions & activities present
 
       await expect(service.regenerate(kitId, 'script')).rejects.toThrow(
         BadRequestException,
       );
     });
 
+    it('throws BadRequestException when regenerating script without expressions in DB', async () => {
+      classroomExpressionsService.findByKitId.mockResolvedValueOnce([]); // expressions empty; vocab & activities present
+
+      await expect(service.regenerate(kitId, 'script')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('throws BadRequestException when regenerating script without activities in DB', async () => {
+      activitiesService.findByKitId.mockResolvedValueOnce([]); // activities empty; vocab & expressions present
+
+      await expect(service.regenerate(kitId, 'script')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // QUESTIONS: each dependency individually missing must throw
     it('throws BadRequestException when regenerating questions without scripts in DB', async () => {
-      teachingScriptsService.findByKitId.mockResolvedValueOnce([]); // empty
+      teachingScriptsService.findByKitId.mockResolvedValueOnce([]); // scripts empty; activities present
 
       await expect(service.regenerate(kitId, 'questions')).rejects.toThrow(
         BadRequestException,
       );
     });
 
+    it('throws BadRequestException when regenerating questions without activities in DB', async () => {
+      activitiesService.findByKitId.mockResolvedValueOnce([]); // activities empty; scripts present
+
+      await expect(service.regenerate(kitId, 'questions')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // ASSESSMENT: each dependency individually missing must throw
     it('throws BadRequestException when regenerating assessment without scripts in DB', async () => {
-      teachingScriptsService.findByKitId.mockResolvedValueOnce([]); // empty
+      teachingScriptsService.findByKitId.mockResolvedValueOnce([]); // scripts empty; activities present
 
       await expect(service.regenerate(kitId, 'assessment')).rejects.toThrow(
         BadRequestException,
+      );
+    });
+
+    it('throws BadRequestException when regenerating assessment without activities in DB', async () => {
+      activitiesService.findByKitId.mockResolvedValueOnce([]); // activities empty; scripts present
+
+      await expect(service.regenerate(kitId, 'assessment')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('does not touch persisted data when generation fails', async () => {
+      vocabulariesService.generate.mockRejectedValueOnce(
+        new Error('AI generation failed'),
+      );
+
+      await expect(service.regenerate(kitId, 'vocabulary')).rejects.toThrow(
+        'AI generation failed',
+      );
+      expect(persistenceService.replaceComponent).not.toHaveBeenCalled();
+    });
+
+    it('propagates an atomic persistence failure', async () => {
+      persistenceService.replaceComponent.mockRejectedValueOnce(
+        new Error('Transaction aborted'),
+      );
+
+      await expect(service.regenerate(kitId, 'vocabulary')).rejects.toThrow(
+        'Transaction aborted',
       );
     });
   });

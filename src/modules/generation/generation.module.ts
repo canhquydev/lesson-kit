@@ -8,6 +8,7 @@ import { StudentQuestionsModule } from '../student-questions/student-questions.m
 import { TeachingScriptsModule } from '../teaching-scripts/teaching-scripts.module';
 import { VocabulariesModule } from '../vocabularies/vocabularies.module';
 import { GenerationService } from './generation.service';
+import { RegenerationPersistenceService } from './regeneration-persistence.service';
 import { RegenerateService } from './regenerate.service';
 
 @Module({
@@ -21,7 +22,11 @@ import { RegenerateService } from './regenerate.service';
     StudentQuestionsModule,
     AssessmentsModule,
   ],
-  providers: [GenerationService, RegenerateService],
+  providers: [
+    GenerationService,
+    RegenerateService,
+    RegenerationPersistenceService,
+  ],
   exports: [GenerationService, RegenerateService],
 })
 export class GenerationModule {}

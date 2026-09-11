@@ -100,8 +100,12 @@ describe('StudentQuestions Day 1 artifacts', () => {
   describe('prompt', () => {
     it('includes lesson dependencies and the complete output contract', () => {
       const prompt = buildStudentQuestionPrompt(context, {
-        teachingScripts: [{ objective: 'Explain net force' }],
-        activities: [{ activity_name: 'Force experiment' }],
+        teachingScripts: [
+          { activity_name: 'Introduction', objective: 'Explain net force' },
+        ],
+        activities: [
+          { activity_name: 'Force experiment', duration_minutes: 10 },
+        ],
       });
 
       expect(STUDENT_QUESTION_SYSTEM_PROMPT).toContain('valid JSON object');

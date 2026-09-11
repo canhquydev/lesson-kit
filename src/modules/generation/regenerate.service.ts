@@ -1,10 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ComponentType } from '../../common/enums';
+import { ComponentType, LessonKitStatus } from '../../common/enums';
 import { GenerationContext } from '../../common/interfaces';
 import { ActivitiesService } from '../activities/activities.service';
 import { AssessmentsService } from '../assessments/assessments.service';
@@ -14,6 +15,7 @@ import { LessonKitsService } from '../lesson-kits/lesson-kits.service';
 import { StudentQuestionsService } from '../student-questions/student-questions.service';
 import { TeachingScriptsService } from '../teaching-scripts/teaching-scripts.service';
 import { VocabulariesService } from '../vocabularies/vocabularies.service';
+import { RegenerationPersistenceService } from './regeneration-persistence.service';
 
 /**
  * Dependency stale-marking matrix:
@@ -44,6 +46,7 @@ export const STALE_DEPENDENCIES_MAP: Record<ComponentType, ComponentType[]> = {
 export interface RegenerateResult {
   lesson_kit_id: string;
   component: ComponentType;
+  status: 'regenerated';
   regenerated: boolean;
   stale_components: ComponentType[];
   data: unknown[];
@@ -62,6 +65,7 @@ export class RegenerateService {
     private readonly teachingScriptsService: TeachingScriptsService,
     private readonly studentQuestionsService: StudentQuestionsService,
     private readonly assessmentsService: AssessmentsService,
+    private readonly persistenceService: RegenerationPersistenceService,
   ) {}
 
   /**
@@ -82,6 +86,11 @@ export class RegenerateService {
     if (!kit) {
       throw new NotFoundException(
         `Lesson Kit with ID "${lessonKitId}" not found`,
+      );
+    }
+    if (kit.status !== LessonKitStatus.COMPLETED) {
+      throw new ConflictException(
+        `Cannot regenerate a component while Lesson Kit status is "${kit.status}".`,
       );
     }
 
@@ -111,33 +120,18 @@ export class RegenerateService {
     // 4. Regenerate target component
     switch (componentType) {
       case ComponentType.VOCABULARY: {
-        const vocab = await this.vocabulariesService.generate(context);
-        await this.vocabulariesService.deleteByKitId(lessonKitId);
-        generatedData = await this.vocabulariesService.saveBulk(
-          lessonKitId,
-          vocab,
-        );
+        generatedData = await this.vocabulariesService.generate(context);
         break;
       }
 
       case ComponentType.EXPRESSIONS: {
-        const expressions =
+        generatedData =
           await this.classroomExpressionsService.generate(context);
-        await this.classroomExpressionsService.deleteByKitId(lessonKitId);
-        generatedData = await this.classroomExpressionsService.saveBulk(
-          lessonKitId,
-          expressions,
-        );
         break;
       }
 
       case ComponentType.ACTIVITIES: {
-        const activities = await this.activitiesService.generate(context);
-        await this.activitiesService.deleteByKitId(lessonKitId);
-        generatedData = await this.activitiesService.saveBulk(
-          lessonKitId,
-          activities,
-        );
+        generatedData = await this.activitiesService.generate(context);
         break;
       }
 
@@ -159,17 +153,11 @@ export class RegenerateService {
           );
         }
 
-        const scripts = await this.teachingScriptsService.generate(context, {
+        generatedData = await this.teachingScriptsService.generate(context, {
           vocabularies: vocab,
-          vocab,
           expressions,
           activities,
         });
-        await this.teachingScriptsService.deleteByKitId(lessonKitId);
-        generatedData = await this.teachingScriptsService.saveBulk(
-          lessonKitId,
-          scripts,
-        );
         break;
       }
 
@@ -186,15 +174,10 @@ export class RegenerateService {
           );
         }
 
-        const questions = await this.studentQuestionsService.generate(context, {
+        generatedData = await this.studentQuestionsService.generate(context, {
           teachingScripts: scripts,
           activities,
         });
-        await this.studentQuestionsService.deleteByKitId(lessonKitId);
-        generatedData = await this.studentQuestionsService.saveBulk(
-          lessonKitId,
-          questions,
-        );
         break;
       }
 
@@ -211,31 +194,33 @@ export class RegenerateService {
           );
         }
 
-        const assessments = await this.assessmentsService.generate(context, {
+        generatedData = await this.assessmentsService.generate(context, {
           teachingScripts: scripts,
           activities,
         });
-        await this.assessmentsService.deleteByKitId(lessonKitId);
-        generatedData = await this.assessmentsService.saveBulk(
-          lessonKitId,
-          assessments,
-        );
         break;
       }
     }
 
-    const staleComponents = STALE_DEPENDENCIES_MAP[componentType] ?? [];
+    const downstreamComponents = STALE_DEPENDENCIES_MAP[componentType] ?? [];
+    const persisted = await this.persistenceService.replaceComponent(
+      lessonKitId,
+      componentType,
+      generatedData,
+      downstreamComponents,
+    );
 
     this.logger.log(
-      `Regenerated "${componentType}" for kit ${lessonKitId}. Stale components: [${staleComponents.join(', ')}]`,
+      `Regenerated "${componentType}" for kit ${lessonKitId}. Stale components: [${persisted.staleComponents.join(', ')}]`,
     );
 
     return {
       lesson_kit_id: lessonKitId,
       component: componentType,
+      status: 'regenerated',
       regenerated: true,
-      stale_components: staleComponents,
-      data: generatedData,
+      stale_components: persisted.staleComponents,
+      data: persisted.data,
     };
   }
 
