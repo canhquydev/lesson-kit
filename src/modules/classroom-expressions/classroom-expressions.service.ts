@@ -9,6 +9,7 @@ import {
 import { AiService } from '../ai/ai.service';
 import {
   ComponentGenerator,
+  ComponentDependencies,
   ValidationResult,
   validateAndRetry,
 } from '../../common/validators';
@@ -31,6 +32,7 @@ export class ClassroomExpressionsService
    */
   async generate(
     context: GenerationContext,
+    dependencies?: ComponentDependencies,
   ): Promise<ClassroomExpressionDocument[]> {
     this.logger.log(
       `Generating classroom expressions for lesson: "${context.title}" (${context.subject} Grade ${context.grade}, Support: ${context.supportLevel})`,
@@ -38,7 +40,7 @@ export class ClassroomExpressionsService
 
     const rawExpressions = await validateAndRetry<any>(
       async (previousErrors?: string[]) => {
-        const prompt = this.getPrompt(context, previousErrors);
+        const prompt = this.getPrompt(context, dependencies, previousErrors);
         const response = await this.aiService.generateJson<{
           expressions: any[];
         }>([
@@ -149,7 +151,21 @@ export class ClassroomExpressionsService
   /**
    * Tạo prompt chi tiết hướng dẫn AI sinh mẫu câu
    */
-  getPrompt(context: GenerationContext, retryErrors?: string[]): string {
+  getPrompt(
+    context: GenerationContext,
+    dependencies?: ComponentDependencies,
+    retryErrors?: string[],
+  ): string;
+  getPrompt(context: GenerationContext, retryErrors?: string[]): string;
+  getPrompt(
+    context: GenerationContext,
+    dependenciesOrErrors?: ComponentDependencies | string[],
+    retryErrors?: string[],
+  ): string {
+    const retryErrList = Array.isArray(dependenciesOrErrors)
+      ? dependenciesOrErrors
+      : retryErrors;
+
     let prompt = `Bạn là chuyên gia sư phạm song ngữ và phương pháp giảng dạy bằng tiếng Anh (EMI/CLIL).
 Hãy sinh danh sách MẪU CÂU TRÊN LỚP (Classroom Expressions - Phase 1 Component) để giáo viên có thể nói trực tiếp khi giảng dạy bài học sau:
 
@@ -196,10 +212,10 @@ Trả về đối tượng JSON duy nhất có cấu trúc:
 }
 `;
 
-    if (retryErrors && retryErrors.length > 0) {
+    if (retryErrList && retryErrList.length > 0) {
       prompt += `
 ⚠️ CHÚ Ý: Lần sinh trước bị lỗi validation. Bạn BẮT BUỘC phải khắc phục triệt để các lỗi sau:
-${retryErrors.map((err, i) => `${i + 1}. ${err}`).join('\n')}
+${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
 `;
     }
 
