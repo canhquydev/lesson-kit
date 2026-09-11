@@ -10,6 +10,7 @@ import {
   validateAndRetry,
 } from '../../common/validators';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { TeachingScriptItemDto } from './dto';
 import {
   buildTeachingScriptPrompt,
@@ -21,32 +22,16 @@ import {
   TeachingScriptDocument,
 } from './schemas/teaching-script.schema';
 
-// ---------------------------------------------------------------------------
-// Internal normalised dependency shape
-// ---------------------------------------------------------------------------
 type ResolvedDependencies = {
   vocabularies: NonNullable<TeachingScriptPromptDependencies['vocabularies']>;
   expressions: TeachingScriptPromptDependencies['expressions'];
   activities: TeachingScriptPromptDependencies['activities'];
 };
 
-// ---------------------------------------------------------------------------
-// Guard type for AI response
-// ---------------------------------------------------------------------------
 interface TeachingScriptResponse {
   teaching_scripts?: unknown;
 }
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
-
-/**
- * Dev C — Teaching Scripts Service
- *
- * Implements the shared ComponentGenerator contract with the Phase 2
- * dependency shape. Persistence methods return TeachingScriptDocument[].
- */
 @Injectable()
 export class TeachingScriptsService implements ComponentGenerator<
   TeachingScript,
@@ -58,6 +43,7 @@ export class TeachingScriptsService implements ComponentGenerator<
     @InjectModel(TeachingScript.name)
     private readonly teachingScriptModel: Model<TeachingScriptDocument>,
     private readonly aiService: AiService,
+    private readonly aiLogsService: AiLogsService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -88,12 +74,25 @@ export class TeachingScriptsService implements ComponentGenerator<
         }
 
         const response = raw as TeachingScriptResponse;
-        return Array.isArray(response.teaching_scripts)
+        const items = Array.isArray(response.teaching_scripts)
           ? (response.teaching_scripts as unknown[])
           : [];
+
+        return items;
       },
-      (data: unknown[]) => this.validateForGeneration(data, context, resolved),
+      (data: unknown[]) =>
+        this.validateForGeneration(data, context, resolved),
       3,
+      (attempt, errors, rawData) => {
+        this.aiLogsService.logError({
+          kitId: context.lessonContentId,
+          component: 'teaching_scripts',
+          attempt,
+          errorType: 'VALIDATION_FAILED',
+          errorMessages: errors,
+          rawOutput: JSON.stringify(rawData).substring(0, 5000),
+        });
+      },
     );
 
     return scripts;

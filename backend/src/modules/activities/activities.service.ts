@@ -8,6 +8,7 @@ import {
   GroupType,
 } from './schemas/activity.schema';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import {
   ComponentGenerator,
   ComponentDependencies,
@@ -30,6 +31,7 @@ export class ActivitiesService
     @InjectModel(Activity.name)
     private readonly activityModel: Model<ActivityDocument>,
     private readonly aiService: AiService,
+    private readonly aiLogsService: AiLogsService,
   ) {}
 
   /**
@@ -65,6 +67,16 @@ export class ActivitiesService
       },
       (data: any[]) => this.validate(data),
       3,
+      (attempt, errors, rawData) => {
+        this.aiLogsService.logError({
+          kitId: context.lessonContentId,
+          component: 'activities',
+          attempt,
+          errorType: 'VALIDATION_FAILED',
+          errorMessages: errors,
+          rawOutput: JSON.stringify(rawData).substring(0, 5000),
+        });
+      },
     );
 
     return rawActivities.map((item, index) => ({
@@ -242,7 +254,7 @@ ${context.content}
 --- YÊU CẦU ĐẦU RA (BẮT BUỘC) ---
 1. Số lượng: Đúng từ 2 đến 3 hoạt động (không ít hơn 2 và không nhiều hơn 3).
 2. Phục vụ mục tiêu: Hoạt động phải phục vụ trực tiếp mục tiêu kiến thức và kỹ năng của bài học, không đơn thuần chơi cho vui.
-3. Thời lượng hợp lý: Thời lượng mỗi hoạt động từ 5 đến 15 phút, tổng thời lượng các hoạt động không được vượt quá thời lượng tiết học (${context.duration} phút) để đảm bảo thời gian cho các phần khác trong tiết.
+3. Thời lượng hợp lý: Tổng thời lượng tiết học là ${context.duration} phút. Hãy tự cân đối thời lượng mỗi hoạt động dựa trên tính chất bài học (bài thực hành → hoạt động nhiều hơn, bài lý thuyết → hoạt động ít hơn). QUAN TRỌNG: Phải chừa đủ thời gian (tối thiểu 8 phút) cho các phần khác trong tiết như mở bài (warm-up), kiểm tra đánh giá (assessment) và tổng kết (wrap-up) — tức tổng thời lượng activities KHÔNG được bằng toàn bộ thời lượng tiết.
 4. Hình thức nhóm (group_type): Chọn một trong các giá trị sau: individual | pair | group | whole_class.
 5. Hướng dẫn chi tiết (instructions): Các bước rõ ràng cho giáo viên tổ chức từ chuẩn bị đến thực hiện và kết luận.
 6. Lời nói tiếng Anh (english_instructions): Câu tiếng Anh khẩu ngữ giáo viên dùng để giao nhiệm vụ hoặc điều hành hoạt động.

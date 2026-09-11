@@ -1,5 +1,5 @@
 // ─── Base API Helpers ───────────────────────────────────────────────
-const BASE = '/api';
+const BASE = (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '') + '/api';
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -67,8 +67,9 @@ export function getKitDetail(id: string) {
   return api.get<LessonKitDetail>(`/lesson-kit/${id}`);
 }
 
-export function getKitList(page = 1, limit = 20) {
-  return api.get<LessonKitListItem[]>(`/lesson-kit?page=${page}&limit=${limit}`);
+export async function getKitList(page = 1, limit = 20) {
+  const res = await api.get<{ data: LessonKitListItem[]; total: number }>(`/lesson-kit?page=${page}&limit=${limit}`);
+  return res.data ?? [];
 }
 
 export function deleteKit(id: string) {
@@ -78,3 +79,5 @@ export function deleteKit(id: string) {
 export function regenerateComponent(kitId: string, component: string) {
   return api.post<unknown>(`/lesson-kit/${kitId}/regenerate/${component}`);
 }
+
+

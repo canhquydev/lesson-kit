@@ -1,73 +1,161 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import { Combobox, SubjectBadge, CefrPill, StatusBadge, Card, SkeletonRow, toast } from "../components/ui";
-import { ArrowRight, Dots, Eye, Plus, Refresh, Search, Sparkle, Trash } from "../components/icons";
+import { createPortal } from "react-dom";
+import { Combobox, SubjectBadge, CefrPill, StatusBadge, Card, SkeletonRow, ConfirmModal, toast } from "../components/ui";
+import { Dots, Eye, Plus, Refresh, Search, Trash } from "../components/icons";
+
+
 import { getKitList, deleteKit } from "../lib/api";
 import type { LessonKitListItem } from "../lib/types";
 
-// Map backend subject codes → English display names
 const SUBJECT_DISPLAY: Record<string, string> = {
-  VAT_LI: "Physics",
-  HOA_HOC: "Chemistry",
-  SINH_HOC: "Biology",
-  TOAN: "Math",
+  VAT_LI: "Vật lí",
+  HOA_HOC: "Hóa học",
+  SINH_HOC: "Sinh học",
+  TOAN: "Toán",
 };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+const SUBJECT_OPTIONS = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "Vật lí", label: "Vật lí" },
+  { value: "Hóa học", label: "Hóa học" },
+  { value: "Sinh học", label: "Sinh học" },
+  { value: "Toán", label: "Toán" },
+];
 
-function capitalizeStatus(s: string): string {
-  if (s === "completed") return "Completed";
-  if (s === "generating") return "Generating";
-  return "Failed";
+const STATUS_OPTIONS = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "completed", label: "Hoàn thành" },
+  { value: "generating", label: "Đang tạo" },
+  { value: "failed", label: "Thất bại" },
+];
+
+function formatDateTime(iso: string) {
+  if (!iso) return { date: "-", time: "" };
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return { date: "-", time: "" };
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return {
+    date: `${day}/${month}/${year}`,
+    time: `${hours}:${minutes}`,
+  };
 }
 
 function RowMenu({ onView, onDelete }: { onView: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top?: number; bottom?: number; right: number }>({ right: 0 });
+
+  const updatePosition = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const right = Math.max(12, window.innerWidth - rect.right);
+
+    if (spaceBelow < 120) {
+      // Not enough space below (e.g. bottom row) -> open upwards
+      setCoords({
+        bottom: window.innerHeight - rect.top + 6,
+        right,
+      });
+    } else {
+      // Plenty of space below -> open downwards
+      setCoords({
+        top: rect.bottom + 6,
+        right,
+      });
+    }
+  }, []);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open) {
+      updatePosition();
+    }
+    setOpen((v) => !v);
+  };
+
   useEffect(() => {
     if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        btnRef.current?.contains(e.target as Node) ||
+        menuRef.current?.contains(e.target as Node)
+      ) {
+        return;
+      }
+      setOpen(false);
     };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+
+    const handleScrollOrResize = () => {
+      setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
   }, [open]);
+
   const items = [
-    { label: "View", icon: Eye, action: onView },
-    { label: "Delete", icon: Trash, action: onDelete, danger: true },
+    { label: "Xem", icon: Eye, action: onView },
+    { label: "Xóa", icon: Trash, action: onDelete, danger: true },
   ];
+
   return (
-    <div ref={ref} className="relative flex justify-end">
+    <div className="flex justify-end">
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        type="button"
+        onClick={handleToggle}
         className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
       >
         <Dots />
       </button>
-      {open && (
-        <div className="lk-fade-up absolute right-0 top-9 z-20 w-40 overflow-hidden rounded-[11px] border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/[0.08]">
-          {items.map((it) => (
-            <button
-              key={it.label}
-              onClick={() => {
-                it.action();
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors ${
-                it.danger ? "text-rose-600 hover:bg-rose-50" : "text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <it.icon width={15} height={15} />
-              {it.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              top: coords.top !== undefined ? `${coords.top}px` : undefined,
+              bottom: coords.bottom !== undefined ? `${coords.bottom}px` : undefined,
+              right: `${coords.right}px`,
+              zIndex: 9999,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="lk-fade-up w-40 overflow-hidden rounded-[12px] border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10"
+          >
+            {items.map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  it.action();
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors ${
+                  it.danger ? "text-rose-600 hover:bg-rose-50" : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <it.icon width={15} height={15} />
+                {it.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -76,14 +164,16 @@ export function Dashboard({
   onOpenKit,
   onCreate,
 }: {
-  onOpenKit: (id: string) => void;
+  onOpenKit: (id: string, status?: string) => void;
   onCreate: () => void;
 }) {
   const [kits, setKits] = useState<LessonKitListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [subject, setSubject] = useState("All");
-  const [status, setStatus] = useState("All");
+  const [subject, setSubject] = useState("ALL");
+  const [status, setStatus] = useState("ALL");
+
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const loadKits = useCallback(() => {
     setLoading(true);
@@ -95,8 +185,14 @@ export function Dashboard({
 
   useEffect(() => { loadKits(); }, [loadKits]);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Bạn có chắc muốn xóa Lesson Kit này?")) return;
+  function handleDelete(id: string) {
+    setDeleteTargetId(id);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
     // Optimistic delete
     setKits((prev) => prev.filter((k) => k._id !== id));
     try {
@@ -110,46 +206,56 @@ export function Dashboard({
 
   const filtered = useMemo(
     () =>
-      kits.filter(
-        (k) =>
-          k.lesson_topic.toLowerCase().includes(q.toLowerCase()) &&
-          (subject === "All" || SUBJECT_DISPLAY[k.subject] === subject) &&
-          (status === "All" || capitalizeStatus(k.status) === status),
-      ),
+      kits.filter((k) => {
+        const matchQ = !q.trim() || k.lesson_topic.toLowerCase().includes(q.toLowerCase().trim());
+        const mappedSubject = SUBJECT_DISPLAY[k.subject] || k.subject;
+        const matchSubject = subject === "ALL" || mappedSubject === subject;
+        const matchStatus = status === "ALL" || k.status.toLowerCase() === status.toLowerCase();
+        return matchQ && matchSubject && matchStatus;
+      }),
     [kits, q, subject, status],
   );
 
-  const opt = (arr: string[]) => arr.map((v) => ({ value: v, label: v }));
-
   return (
-    <div className="mx-auto max-w-[1240px] px-6 py-8">
-      {/* Prominent Create Lesson Kit CTA */}
-      <button
-        onClick={onCreate}
-        className="lk-fade-up group relative mb-7 flex w-full items-center gap-5 overflow-hidden rounded-[18px] bg-gradient-to-br from-indigo-600 to-violet-600 px-6 py-6 text-left text-white shadow-lg shadow-indigo-600/25 transition-all hover:shadow-xl hover:shadow-indigo-600/30 active:scale-[0.995]"
-      >
-        <div className="pointer-events-none absolute -right-8 -top-16 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-16 right-24 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] bg-white/15 ring-1 ring-white/25 backdrop-blur-sm">
-          <Sparkle width={26} height={26} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-indigo-100">
-            AI Pipeline · Song ngữ Anh–Việt
-          </p>
-          <h2 className="mt-1 font-display text-[21px] font-bold tracking-tight sm:text-[23px]">
-            Tạo Lesson Kit mới trong vài phút
-          </h2>
-          <p className="mt-0.5 hidden max-w-lg text-[13.5px] text-indigo-100 sm:block">
-            Từ vựng có IPA, kịch bản giảng dạy hai cột, câu hỏi &amp; đánh giá — tất cả tự động, chuẩn khung chương trình.
+    <div className="mx-auto max-w-[1600px] px-6 py-8">
+      {/* Dashboard Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-display text-[24px] font-bold tracking-tight text-slate-900">
+            Quản lý bài giảng
+          </h1>
+          <p className="mt-1 text-[13.5px] text-slate-500">
+            Biên soạn và quản lý các bộ học liệu song ngữ theo khung chương trình phổ thông
           </p>
         </div>
-        <span className="hidden shrink-0 items-center gap-2 rounded-[12px] bg-white px-5 py-3 text-[14px] font-semibold text-indigo-700 shadow-sm transition-transform group-hover:translate-x-0.5 sm:flex">
-          <Plus width={17} height={17} />
-          Create Lesson Kit
-          <ArrowRight width={17} height={17} />
-        </span>
-      </button>
+        <button
+          onClick={onCreate}
+          className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-indigo-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm shadow-indigo-600/20 hover:bg-indigo-500 active:scale-[0.98] transition-all shrink-0"
+        >
+          <Plus width={16} height={16} strokeWidth={2.4} />
+          <span>Tạo bài giảng mới</span>
+        </button>
+      </div>
+
+      {/* Quick summary stats */}
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-[12px] border border-slate-200 bg-white p-4 shadow-2xs">
+          <p className="text-[12.5px] font-medium text-slate-500">Tổng số bài giảng</p>
+          <p className="mt-1 font-display text-[22px] font-bold text-slate-900">{kits.length}</p>
+        </div>
+        <div className="rounded-[12px] border border-slate-200 bg-white p-4 shadow-2xs">
+          <p className="text-[12.5px] font-medium text-slate-500">Đã hoàn thành</p>
+          <p className="mt-1 font-display text-[22px] font-bold text-emerald-600">
+            {kits.filter((k) => k.status?.toLowerCase() === "completed").length}
+          </p>
+        </div>
+        <div className="rounded-[12px] border border-slate-200 bg-white p-4 shadow-2xs">
+          <p className="text-[12.5px] font-medium text-slate-500">Đang xử lý</p>
+          <p className="mt-1 font-display text-[22px] font-bold text-amber-600">
+            {kits.filter((k) => k.status?.toLowerCase() === "generating").length}
+          </p>
+        </div>
+      </div>
 
       {/* Filter bar */}
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end">
@@ -165,10 +271,10 @@ export function Dashboard({
             />
           </div>
         </div>
-        <Combobox label="Subject" value={subject} onChange={setSubject} className="lg:w-44"
-          options={opt(["All", "Physics", "Chemistry", "Biology", "Math"])} />
-        <Combobox label="Status" value={status} onChange={setStatus} className="lg:w-40"
-          options={opt(["All", "Completed", "Generating", "Failed"])} />
+        <Combobox label="Môn học" value={subject} onChange={setSubject} className="lg:w-44"
+          options={SUBJECT_OPTIONS} />
+        <Combobox label="Trạng thái" value={status} onChange={setStatus} className="lg:w-44"
+          options={STATUS_OPTIONS} />
       </div>
 
       {/* Table */}
@@ -177,14 +283,14 @@ export function Dashboard({
           <table className="w-full min-w-[880px] border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/60 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
-                <th className="px-5 py-3">Lesson Title</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Grade</th>
-                <th className="px-4 py-3">Duration</th>
+                <th className="px-5 py-3">Tên bài giảng</th>
+                <th className="px-4 py-3">Môn học</th>
+                <th className="px-4 py-3">Lớp</th>
+                <th className="px-4 py-3">Thời lượng</th>
                 <th className="px-4 py-3">CEFR</th>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Action</th>
+                <th className="px-4 py-3">Ngày tạo</th>
+                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-5 py-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -203,34 +309,51 @@ export function Dashboard({
                   </td>
                 </tr>
               ) : (
-                filtered.map((k) => (
-                  <tr
-                    key={k._id}
-                    onClick={() => onOpenKit(k._id)}
-                    className="cursor-pointer border-b border-slate-100 text-[13.5px] transition-colors last:border-0 hover:bg-slate-50/70"
-                  >
-                    <td className="px-5 py-3.5 font-medium text-slate-900">{k.lesson_topic}</td>
-                    <td className="px-4 py-3.5">
-                      <SubjectBadge subject={SUBJECT_DISPLAY[k.subject] || k.subject} />
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-600">Lớp {k.grade}</td>
-                    <td className="px-4 py-3.5 text-slate-600">{k.duration} phút</td>
-                    <td className="px-4 py-3.5"><CefrPill level={k.support_level} /></td>
-                    <td className="px-4 py-3.5 text-slate-500">{formatDate(k.createdAt)}</td>
-                    <td className="px-4 py-3.5"><StatusBadge status={capitalizeStatus(k.status)} /></td>
+                filtered.map((k) => {
+                  const dt = formatDateTime(k.createdAt);
+                  return (
+                    <tr
+                      key={k._id}
+                      onClick={() => onOpenKit(k._id, k.status)}
+                      className="cursor-pointer border-b border-slate-100 text-[13.5px] transition-colors last:border-0 hover:bg-slate-50/70"
+                    >
+                      <td className="px-5 py-3.5 font-medium text-slate-900">{k.lesson_topic}</td>
+                      <td className="px-4 py-3.5">
+                        <SubjectBadge subject={SUBJECT_DISPLAY[k.subject] || k.subject} />
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-600">Lớp {k.grade}</td>
+                      <td className="px-4 py-3.5 text-slate-600">{k.duration} phút</td>
+                      <td className="px-4 py-3.5"><CefrPill level={k.support_level} /></td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <div className="font-medium text-slate-800">{dt.date}</div>
+                        {dt.time && <div className="text-[11.5px] text-slate-400">{dt.time}</div>}
+                      </td>
+                      <td className="px-4 py-3.5"><StatusBadge status={k.status} /></td>
                     <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                       <RowMenu
-                        onView={() => onOpenKit(k._id)}
+                        onView={() => onOpenKit(k._id, k.status)}
                         onDelete={() => handleDelete(k._id)}
                       />
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </Card>
+
+      <ConfirmModal
+        open={!!deleteTargetId}
+        title="Xác nhận xóa Lesson Kit"
+        message="Bạn có chắc chắn muốn xóa Lesson Kit này không? Dữ liệu đã xóa sẽ không thể khôi phục."
+        confirmLabel="Xóa bài giảng"
+        cancelLabel="Hủy"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

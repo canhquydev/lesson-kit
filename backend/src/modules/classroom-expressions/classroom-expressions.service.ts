@@ -7,6 +7,7 @@ import {
   ExpressionCategory,
 } from './schemas/classroom-expression.schema';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import {
   ComponentGenerator,
   ComponentDependencies,
@@ -25,6 +26,7 @@ export class ClassroomExpressionsService
     @InjectModel(ClassroomExpression.name)
     private readonly expressionModel: Model<ClassroomExpressionDocument>,
     private readonly aiService: AiService,
+    private readonly aiLogsService: AiLogsService,
   ) {}
 
   /**
@@ -60,6 +62,16 @@ export class ClassroomExpressionsService
       },
       (data: any[]) => this.validate(data),
       3,
+      (attempt, errors, rawData) => {
+        this.aiLogsService.logError({
+          kitId: context.lessonContentId,
+          component: 'classroom_expressions',
+          attempt,
+          errorType: 'VALIDATION_FAILED',
+          errorMessages: errors,
+          rawOutput: JSON.stringify(rawData).substring(0, 5000),
+        });
+      },
     );
 
     return rawExpressions.map((item, index) => ({

@@ -10,6 +10,7 @@ import {
   validateAndRetry,
 } from '../../common/validators';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { AssessmentQuestionType } from './constants';
 import { AssessmentItemDto } from './dto';
 import {
@@ -51,6 +52,7 @@ export class AssessmentsService implements ComponentGenerator<
     @InjectModel(Assessment.name)
     private readonly assessmentModel: Model<AssessmentDocument>,
     private readonly aiService: AiService,
+    private readonly aiLogsService: AiLogsService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -82,12 +84,38 @@ export class AssessmentsService implements ComponentGenerator<
         }
 
         const response = raw as AssessmentResponse;
-        return Array.isArray(response.assessments)
+        const items = Array.isArray(response.assessments)
           ? (response.assessments as unknown[])
           : [];
+
+        // Pre-sanitize matching correct_answer (semicolon, colon, extra text)
+        for (const item of items) {
+          if (
+            this.isRecord(item) &&
+            item.question_type === 'matching' &&
+            typeof item.correct_answer === 'string'
+          ) {
+            let cleaned = item.correct_answer.replace(/\([^)]*\)/g, '');
+            cleaned = cleaned.replace(/;/g, ',');
+            cleaned = cleaned.replace(/(\d+)\s*[:.]\s*([a-zA-Z])/g, '$1-$2');
+            item.correct_answer = cleaned.trim();
+          }
+        }
+
+        return items;
       },
       (data: unknown[]) => this.validate(data),
       3,
+      (attempt, errors, rawData) => {
+        this.aiLogsService.logError({
+          kitId: context.lessonContentId,
+          component: 'assessments',
+          attempt,
+          errorType: 'VALIDATION_FAILED',
+          errorMessages: errors,
+          rawOutput: JSON.stringify(rawData).substring(0, 5000),
+        });
+      },
     );
 
     return assessments;

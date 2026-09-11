@@ -1,12 +1,10 @@
-import { useState } from "react";
-import { TopBar } from "./components/TopBar";
+import { useEffect, useState } from "react";
 import { ToastContainer } from "./components/ui";
 import { Dashboard } from "./views/Dashboard";
 import { CreateForm } from "./views/CreateForm";
 import { Progress } from "./views/Progress";
 import { Detail } from "./views/Detail";
-
-type View = "dashboard" | "create" | "progress" | "detail";
+import { parseCurrentRoute, navigateTo, TAB_TO_SLUG, type Route } from "./lib/router";
 
 export interface FormData {
   subject: string;
@@ -18,44 +16,63 @@ export interface FormData {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("dashboard");
-  const [selectedKitId, setSelectedKitId] = useState<string | null>(null);
+  const [route, setRoute] = useState<Route>(() => parseCurrentRoute());
   const [formData, setFormData] = useState<FormData | null>(null);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(parseCurrentRoute());
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   return (
     <div className="min-h-full bg-slate-50 text-slate-900">
-      <TopBar onCreate={() => setView("create")} onHome={() => setView("dashboard")} />
       <main>
-        {view === "dashboard" && (
+        {route.view === "dashboard" && (
           <Dashboard
-            onOpenKit={(id) => {
-              setSelectedKitId(id);
-              setView("detail");
+            onOpenKit={(id, status) => {
+              if (status?.toLowerCase() === "generating") {
+                navigateTo(`/progress/${id}`);
+                return;
+              }
+              const savedTab = localStorage.getItem(`kit_${id}_tab`);
+              const slug = (savedTab && TAB_TO_SLUG[savedTab]) || "tu-vung";
+              navigateTo(`/kit/${id}?tab=${slug}`);
             }}
-            onCreate={() => setView("create")}
+            onCreate={() => navigateTo("/create")}
           />
         )}
-        {view === "create" && (
+        {route.view === "create" && (
           <CreateForm
-            onBack={() => setView("dashboard")}
+            onBack={() => navigateTo("/")}
             onGenerate={(kitId, data) => {
-              setSelectedKitId(kitId);
               setFormData(data);
-              setView("progress");
+              navigateTo(`/progress/${kitId}`);
             }}
           />
         )}
-        {view === "progress" && selectedKitId && (
+        {route.view === "progress" && (
           <Progress
-            kitId={selectedKitId}
+            kitId={route.kitId}
             formData={formData}
-            onDone={() => setView("detail")}
+            onDone={() => {
+              const savedTab = localStorage.getItem(`kit_${route.kitId}_tab`);
+              const slug = (savedTab && TAB_TO_SLUG[savedTab]) || "tu-vung";
+              navigateTo(`/kit/${route.kitId}?tab=${slug}`, true);
+            }}
           />
         )}
-        {view === "detail" && selectedKitId && (
+        {route.view === "detail" && (
           <Detail
-            kitId={selectedKitId}
-            onBack={() => setView("dashboard")}
+            kitId={route.kitId}
+            initialTab={route.tab}
+            onBack={() => navigateTo("/")}
+            onTabChange={(newTab) => {
+              const slug = TAB_TO_SLUG[newTab] || "tu-vung";
+              navigateTo(`/kit/${route.kitId}?tab=${slug}`, true);
+            }}
           />
         )}
       </main>
@@ -63,3 +80,4 @@ export default function App() {
     </div>
   );
 }
+

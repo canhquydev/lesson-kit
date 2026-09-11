@@ -44,6 +44,9 @@ export class LessonKit {
 
   @Prop()
   current_step: string;
+
+  @Prop({ type: [String], default: [] })
+  stale_components?: string[];
 }
 
 export const LessonKitSchema = SchemaFactory.createForClass(LessonKit);

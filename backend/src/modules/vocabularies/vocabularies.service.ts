@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Vocabulary, VocabularyDocument } from './schemas/vocabulary.schema';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import {
   ComponentGenerator,
   ComponentDependencies,
@@ -20,6 +21,7 @@ export class VocabulariesService
     @InjectModel(Vocabulary.name)
     private readonly vocabularyModel: Model<VocabularyDocument>,
     private readonly aiService: AiService,
+    private readonly aiLogsService: AiLogsService,
   ) { }
 
   async generate(
@@ -52,6 +54,16 @@ export class VocabulariesService
       },
       (data: any[]) => this.validate(data),
       3,
+      (attempt, errors, rawData) => {
+        this.aiLogsService.logError({
+          kitId: context.lessonContentId,
+          component: 'vocabularies',
+          attempt,
+          errorType: 'VALIDATION_FAILED',
+          errorMessages: errors,
+          rawOutput: JSON.stringify(rawData).substring(0, 5000),
+        });
+      },
     );
 
     return rawVocabularies.map((item, index) => ({

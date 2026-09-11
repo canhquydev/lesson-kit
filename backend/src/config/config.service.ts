@@ -38,39 +38,39 @@ export class LessonConfigService {
       support_levels: [
         {
           code: SupportLevel.A1,
-          name: 'A1 - Beginner',
+          name: 'A1 - Mới bắt đầu',
           description:
-            'Can understand and use familiar everyday expressions and very basic phrases. Can interact in a simple way if the other person speaks slowly and clearly.',
+            'Có thể hiểu và sử dụng các cấu trúc quen thuộc hàng ngày và các từ ngữ cơ bản.',
         },
         {
           code: SupportLevel.A2,
-          name: 'A2 - Elementary',
+          name: 'A2 - Sơ cấp',
           description:
-            'Can understand sentences and frequently used expressions related to immediate areas. Can communicate in simple and routine tasks.',
+            'Có thể hiểu các câu và cấu trúc thường dùng liên quan đến các nhu cầu giao tiếp cơ bản.',
         },
         {
           code: SupportLevel.B1,
-          name: 'B1 - Intermediate',
+          name: 'B1 - Trung cấp',
           description:
-            'Can understand the main points of clear standard input on familiar matters. Can produce simple connected text on familiar topics.',
+            'Có thể hiểu các ý chính của các chủ đề quen thuộc thường gặp trong công việc, học tập.',
         },
         {
           code: SupportLevel.B2,
-          name: 'B2 - Upper Intermediate',
+          name: 'B2 - Trung cấp trên',
           description:
-            'Can understand the main ideas of complex text. Can interact with a degree of fluency and spontaneity with native speakers.',
+            'Có thể hiểu các ý chính của văn bản phức tạp về các chủ đề cụ thể và trừu tượng.',
         },
         {
           code: SupportLevel.C1,
-          name: 'C1 - Advanced',
+          name: 'C1 - Cao cấp',
           description:
-            'Can understand a wide range of demanding, longer texts. Can express ideas fluently and spontaneously without much obvious searching for expressions.',
+            'Có thể hiểu các văn bản dài, phức tạp và nhận biết được các hàm ý ẩn dụ.',
         },
         {
           code: SupportLevel.C2,
-          name: 'C2 - Proficiency',
+          name: 'C2 - Thành thạo',
           description:
-            'Can understand with ease virtually everything heard or read. Can express ideas spontaneously, very fluently and precisely.',
+            'Có thể hiểu một cách dễ dàng hầu như mọi thông tin nghe hoặc đọc được.',
         },
       ],
     };

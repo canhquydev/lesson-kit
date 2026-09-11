@@ -62,13 +62,75 @@ export class RegenerationPersistenceService {
     let staleComponents: ComponentType[] = [];
 
     try {
-      await session.withTransaction(async () => {
-        await model.deleteMany(
-          { lesson_kit_id: lessonKitObjectId },
-          { session },
-        );
+      try {
+        await session.withTransaction(async () => {
+          await model.deleteMany(
+            { lesson_kit_id: lessonKitObjectId },
+            { session },
+          );
 
-        const inserted = await model.insertMany(documents, { session });
+          const inserted = await model.insertMany(documents, { session });
+          persistedData = inserted.map((document) => document.toObject());
+
+          const updatedKit = await this.connection
+            .collection<LessonKitStaleDocument>('lesson_kits')
+            .findOneAndUpdate(
+              { _id: lessonKitObjectId },
+              [
+                {
+                  $set: {
+                    stale_components: {
+                      $setUnion: [
+                        {
+                          $setDifference: [
+                            { $ifNull: ['$stale_components', []] },
+                            [componentType],
+                          ],
+                        },
+                        downstreamComponents,
+                      ],
+                    },
+                  },
+                },
+              ],
+              {
+                session,
+                returnDocument: 'after',
+                projection: { stale_components: 1 },
+              },
+            );
+
+          if (!updatedKit) {
+            throw new NotFoundException(
+              `Lesson Kit with ID "${lessonKitId}" not found`,
+            );
+          }
+
+          const persistedStale = updatedKit.stale_components;
+          staleComponents = Array.isArray(persistedStale)
+            ? persistedStale.filter((value): value is ComponentType =>
+                this.isComponentType(value),
+              )
+            : [];
+        });
+
+        return { data: persistedData, staleComponents };
+      } catch (err) {
+        if (err instanceof NotFoundException) {
+          throw err;
+        }
+        const errMsg = (err as Error)?.message || '';
+        const isTxUnsupported =
+          errMsg.includes('Transaction numbers are only allowed on a replica set member or mongos') ||
+          errMsg.includes('Transactions are not supported') ||
+          errMsg.includes('replica set');
+        if (!isTxUnsupported) {
+          throw err;
+        }
+
+        // Fallback for standalone MongoDB deployments where transactions are not supported
+        await model.deleteMany({ lesson_kit_id: lessonKitObjectId });
+        const inserted = await model.insertMany(documents);
         persistedData = inserted.map((document) => document.toObject());
 
         const updatedKit = await this.connection
@@ -93,27 +155,20 @@ export class RegenerationPersistenceService {
               },
             ],
             {
-              session,
               returnDocument: 'after',
               projection: { stale_components: 1 },
             },
           );
 
-        if (!updatedKit) {
-          throw new NotFoundException(
-            `Lesson Kit with ID "${lessonKitId}" not found`,
-          );
-        }
-
-        const persistedStale = updatedKit.stale_components;
+        const persistedStale = updatedKit?.stale_components;
         staleComponents = Array.isArray(persistedStale)
           ? persistedStale.filter((value): value is ComponentType =>
               this.isComponentType(value),
             )
           : [];
-      });
 
-      return { data: persistedData, staleComponents };
+        return { data: persistedData, staleComponents };
+      }
     } finally {
       await session.endSession();
     }

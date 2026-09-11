@@ -88,9 +88,9 @@ export class RegenerateService {
         `Lesson Kit with ID "${lessonKitId}" not found`,
       );
     }
-    if (kit.status !== LessonKitStatus.COMPLETED) {
+    if (kit.status === LessonKitStatus.GENERATING) {
       throw new ConflictException(
-        `Cannot regenerate a component while Lesson Kit status is "${kit.status}".`,
+        `Cannot regenerate a component while Lesson Kit is actively generating.`,
       );
     }
 
@@ -213,6 +213,31 @@ export class RegenerateService {
     this.logger.log(
       `Regenerated "${componentType}" for kit ${lessonKitId}. Stale components: [${persisted.staleComponents.join(', ')}]`,
     );
+
+    if (kit.status === LessonKitStatus.FAILED) {
+      try {
+        const refreshedKit = await this.lessonKitsService.findById(lessonKitId);
+        const allPresent =
+          (refreshedKit.vocabularies?.length ?? 0) > 0 &&
+          (refreshedKit.classroom_expressions?.length ?? 0) > 0 &&
+          (refreshedKit.activities?.length ?? 0) > 0 &&
+          (refreshedKit.teaching_scripts?.length ?? 0) > 0 &&
+          (refreshedKit.student_questions?.length ?? 0) > 0 &&
+          (refreshedKit.assessments?.length ?? 0) > 0;
+
+        if (allPresent) {
+          await this.lessonKitsService.updateStatus(
+            lessonKitId,
+            LessonKitStatus.COMPLETED,
+          );
+          this.logger.log(
+            `All components present for kit ${lessonKitId}. Promoted status from FAILED to COMPLETED.`,
+          );
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
 
     return {
       lesson_kit_id: lessonKitId,

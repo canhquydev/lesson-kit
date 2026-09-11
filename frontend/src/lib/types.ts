@@ -34,6 +34,11 @@ export interface GenerationStatus {
   progress_percent: number;
   generation_time_ms?: number;
   error_message?: string;
+  subject?: string;
+  grade?: string;
+  lesson_topic?: string;
+  duration?: number;
+  support_level?: string;
 }
 
 export interface LessonKitListItem {
@@ -54,11 +59,12 @@ export interface LessonKitListItem {
 export interface Vocabulary {
   _id: string;
   word: string;
-  ipa: string;
-  word_type: string;
+  phonetic: string;
+  part_of_speech: string;
   meaning_vi: string;
   meaning_en: string;
   example_sentence: string;
+  context_note: string;
   sort_order: number;
 }
 
@@ -66,32 +72,40 @@ export interface Expression {
   _id: string;
   category: string;
   expression_en: string;
-  expression_vi: string;
-  usage_context: string;
+  translation_vi: string;
+  situation_note: string;
   sort_order: number;
 }
 
 export interface Activity {
   _id: string;
   activity_name: string;
-  activity_name_vi: string;
-  description_en: string;
-  description_vi: string;
+  activity_type: string;
+  description: string;
+  objective: string;
   duration_minutes: number;
-  grouping: string;
-  materials: string[];
+  group_type: string;
+  instructions: string;
+  english_instructions: string;
+  student_task: string;
+  expected_outcome: string;
   sort_order: number;
 }
 
 export interface TeachingScript {
   _id: string;
-  step_number: number;
-  step_title: string;
+  step_order?: number;
+  step_number?: number;
+  activity_name?: string;
+  step_title?: string;
+  duration_minutes?: number;
+  objective?: string;
   teacher_speech_en: string;
   teacher_speech_vi: string;
   teacher_action: string;
   expected_student_response: string;
-  sort_order: number;
+  notes?: string;
+  sort_order?: number;
 }
 
 export interface StudentQuestion {
@@ -116,6 +130,7 @@ export interface Assessment {
 // ─── Full Kit Detail ────────────────────────────────────────────────
 export interface LessonKitDetail extends LessonKitListItem {
   lesson_content_id: string;
+  stale_components?: string[];
   vocabularies: Vocabulary[];
   classroom_expressions: Expression[];
   activities: Activity[];
@@ -123,3 +138,4 @@ export interface LessonKitDetail extends LessonKitListItem {
   student_questions: StudentQuestion[];
   assessments: Assessment[];
 }
+

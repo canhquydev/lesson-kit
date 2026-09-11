@@ -13,6 +13,16 @@ const SUBJECT_NAMES: Record<string, string> = {
   TOAN: "Toán",
 };
 
+// Map CEFR levels → Vietnamese display names
+const CEFR_NAMES: Record<string, string> = {
+  A1: "A1 - Mới bắt đầu",
+  A2: "A2 - Sơ cấp",
+  B1: "B1 - Trung cấp",
+  B2: "B2 - Trung cấp trên",
+  C1: "C1 - Cao cấp",
+  C2: "C2 - Thành thạo",
+};
+
 export function CreateForm({
   onBack,
   onGenerate,
@@ -77,7 +87,7 @@ export function CreateForm({
   }));
   const cefrOptions = supportLevels.map((s) => ({
     value: s.code,
-    label: s.name,
+    label: CEFR_NAMES[s.code] || s.name,
   }));
 
   const ready = subject && grade && lessonId && duration && cefr && !generating;
@@ -124,7 +134,7 @@ export function CreateForm({
   }
 
   return (
-    <div className="mx-auto max-w-[1240px] px-6 py-8">
+    <div className="mx-auto max-w-[1600px] px-6 py-8">
       <button
         onClick={onBack}
         className="mb-5 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-slate-500 transition-colors hover:text-slate-800"
@@ -140,10 +150,10 @@ export function CreateForm({
             </span>
             <div>
               <h1 className="font-display text-[22px] font-bold tracking-tight text-slate-900">
-                Create Bilingual Lesson Kit
+                Chuẩn bị bài giảng
               </h1>
               <p className="text-[13px] text-slate-500">
-                Tạo bộ tài liệu song ngữ Anh–Việt theo khung chương trình STEM.
+                AI chuẩn bị sẵn tài nguyên để bạn có thể sử dụng tiếng Anh trong lớp học.
               </p>
             </div>
           </div>
@@ -208,7 +218,7 @@ export function CreateForm({
             ) : (
               <>
                 <Sparkle width={18} height={18} />
-                Tạo Lesson Kit (AI Pipeline)
+                Tạo Lesson Kit
                 <ArrowRight width={18} height={18} />
               </>
             )}

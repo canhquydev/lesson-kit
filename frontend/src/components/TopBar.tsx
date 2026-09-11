@@ -42,7 +42,7 @@ export function TopBar({
             className="flex items-center gap-1.5 rounded-[10px] bg-indigo-600 px-3.5 py-2 text-[13.5px] font-semibold text-white shadow-sm shadow-indigo-600/25 transition-colors hover:bg-indigo-500"
           >
             <Plus width={16} height={16} />
-            <span className="hidden sm:inline">Create Lesson Kit</span>
+            <span className="hidden sm:inline">Tạo Lesson Kit</span>
           </button>
 
           <button className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-[13px] font-semibold text-white ring-2 ring-white">

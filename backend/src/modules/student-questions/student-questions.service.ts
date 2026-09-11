@@ -10,6 +10,7 @@ import {
   validateAndRetry,
 } from '../../common/validators';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { StudentQuestionItemDto } from './dto';
 import {
   buildStudentQuestionPrompt,
@@ -21,23 +22,11 @@ import {
   StudentQuestionDocument,
 } from './schemas/student-question.schema';
 
-// ---------------------------------------------------------------------------
-// Guard type for AI response
-// ---------------------------------------------------------------------------
 interface StudentQuestionResponse {
   student_questions?: unknown;
 }
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
 
-/**
- * Dev C — Student Questions Service
- *
- * Implements the shared ComponentGenerator contract with the Phase 3
- * dependency shape. Persistence methods return StudentQuestionDocument[].
- */
 @Injectable()
 export class StudentQuestionsService implements ComponentGenerator<
   StudentQuestion,
@@ -49,7 +38,8 @@ export class StudentQuestionsService implements ComponentGenerator<
     @InjectModel(StudentQuestion.name)
     private readonly studentQuestionModel: Model<StudentQuestionDocument>,
     private readonly aiService: AiService,
-  ) {}
+    private readonly aiLogsService: AiLogsService,
+  ) { }
 
   // -------------------------------------------------------------------------
   // generate
@@ -86,6 +76,16 @@ export class StudentQuestionsService implements ComponentGenerator<
       },
       (data: unknown[]) => this.validate(data),
       3,
+      (attempt, errors, rawData) => {
+        this.aiLogsService.logError({
+          kitId: context.lessonContentId,
+          component: 'student_questions',
+          attempt,
+          errorType: 'VALIDATION_FAILED',
+          errorMessages: errors,
+          rawOutput: JSON.stringify(rawData).substring(0, 5000),
+        });
+      },
     );
 
     return questions;

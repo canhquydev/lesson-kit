@@ -14,6 +14,7 @@ import { TeachingScriptsModule } from './modules/teaching-scripts/teaching-scrip
 import { StudentQuestionsModule } from './modules/student-questions/student-questions.module';
 import { AssessmentsModule } from './modules/assessments/assessments.module';
 import { GenerationModule } from './modules/generation/generation.module';
+import { AiLogsModule } from './modules/ai-logs/ai-logs.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { GenerationModule } from './modules/generation/generation.module';
 
     // Dev B modules (OpenAI Service & Phase 1 Components)
     AiModule,
+    AiLogsModule,
     VocabulariesModule,
     ClassroomExpressionsModule,
     ActivitiesModule,

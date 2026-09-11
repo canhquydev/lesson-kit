@@ -156,7 +156,10 @@ export class LessonKitsService {
 
   async getStatus(id: string) {
     const kit = await this.lessonKitModel
-      .findById(id, 'status current_step generation_time_ms')
+      .findById(
+        id,
+        'status current_step generation_time_ms subject grade lesson_topic duration support_level',
+      )
       .exec();
     if (!kit) {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
@@ -164,8 +167,16 @@ export class LessonKitsService {
     return {
       status: kit.status,
       current_step: kit.current_step,
-      progress_percent: this.calculateProgressPercent(kit.status, kit.current_step),
+      progress_percent: this.calculateProgressPercent(
+        kit.status,
+        kit.current_step,
+      ),
       generation_time_ms: kit.generation_time_ms,
+      subject: kit.subject,
+      grade: kit.grade,
+      lesson_topic: kit.lesson_topic,
+      duration: kit.duration,
+      support_level: kit.support_level,
     };
   }
 
@@ -178,19 +189,33 @@ export class LessonKitsService {
     const db = this.lessonKitModel.db;
     const kitObjectId = kit._id;
 
-    const session = await db.startSession();
     try {
-      await session.withTransaction(async () => {
-        await Promise.all(
-          LESSON_KIT_COMPONENTS.map((comp) =>
-            db.collection(comp.name).deleteMany({ lesson_kit_id: kitObjectId }, { session }),
-          ),
-        );
-        await this.lessonKitModel.findByIdAndDelete(id).session(session).exec();
-      });
+      const session = await db.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await Promise.all(
+            LESSON_KIT_COMPONENTS.map((comp) =>
+              db.collection(comp.name).deleteMany({ lesson_kit_id: kitObjectId }, { session }),
+            ),
+          );
+          await this.lessonKitModel.findByIdAndDelete(id).session(session).exec();
+        });
+        this.logger.log(`Deleted kit ${id} and all components`);
+        return;
+      } finally {
+        await session.endSession();
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Transaction failed (${(err as Error).message}), falling back to direct deletion`,
+      );
+      await Promise.all(
+        LESSON_KIT_COMPONENTS.map((comp) =>
+          db.collection(comp.name).deleteMany({ lesson_kit_id: kitObjectId }),
+        ),
+      );
+      await this.lessonKitModel.findByIdAndDelete(id).exec();
       this.logger.log(`Deleted kit ${id} and all components`);
-    } finally {
-      await session.endSession();
     }
   }
 }

@@ -18,6 +18,16 @@ export class ValidationError extends Error {
 }
 
 /**
+ * Callback ghi log lỗi AI (fire-and-forget).
+ * Được truyền vào từ service layer để ghi nhận lỗi validation vào DB.
+ */
+export type OnValidationFailCallback = (
+  attempt: number,
+  errors: string[],
+  rawData: unknown[],
+) => void;
+
+/**
  * Thực thi chu trình Sinh và Thẩm định dữ liệu từ AI
  * - Bước 1: Gọi generatorFn để AI sinh dữ liệu thô.
  * - Bước 2: Gọi validatorFn để kiểm tra JSON schema & quy chuẩn nghiệp vụ.
@@ -29,11 +39,13 @@ export class ValidationError extends Error {
  * @param generatorFn Hàm gọi AI, nhận danh sách lỗi của lần trước (nếu có)
  * @param validatorFn Hàm kiểm tra tính hợp lệ
  * @param maxAttempts Số lần thử tối đa (mặc định 3 lần)
+ * @param onValidationFail Callback gọi khi validation thất bại (optional, fire-and-forget)
  */
 export async function validateAndRetry<T>(
   generatorFn: (previousErrors?: string[]) => Promise<any[]>,
   validatorFn: (data: any[]) => ValidationResult,
   maxAttempts = 3,
+  onValidationFail?: OnValidationFailCallback,
 ): Promise<T[]> {
   let attempts = 0;
   let lastErrors: string[] = [];
@@ -54,6 +66,15 @@ export async function validateAndRetry<T>(
     logger.warn(
       `Validation FAILED on attempt ${attempts}: ${lastErrors.join('; ')}`,
     );
+
+    // Ghi log lỗi vào DB (fire-and-forget, không chặn luồng)
+    if (onValidationFail) {
+      try {
+        onValidationFail(attempts, lastErrors, rawData);
+      } catch {
+        // Không để lỗi logging làm ảnh hưởng pipeline
+      }
+    }
   }
 
   throw new ValidationError(
