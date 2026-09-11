@@ -138,24 +138,20 @@ export class LessonKitsService {
       return 0;
     }
 
-    switch (step) {
-      case 'phase1':
-      case 'phase1_vocabulary':
-      case 'phase1_expressions':
-      case 'phase1_activities':
-        return 30;
-      case 'phase2':
-      case 'phase2_script':
-        return 65;
-      case 'phase3':
-      case 'phase3_questions':
-      case 'phase3_assessment':
-        return 90;
-      case 'completed':
-        return 100;
-      default:
-        return 10;
-    }
+    const stepProgressMap: Record<string, number> = {
+      phase1: 5,
+      phase1_vocabulary: 10,
+      phase1_expressions: 20,
+      phase1_activities: 30,
+      phase2: 40,
+      phase2_script: 55,
+      phase3: 65,
+      phase3_questions: 75,
+      phase3_assessment: 90,
+      completed: 100,
+    };
+
+    return stepProgressMap[step ?? ''] ?? 5;
   }
 
   async getStatus(id: string) {

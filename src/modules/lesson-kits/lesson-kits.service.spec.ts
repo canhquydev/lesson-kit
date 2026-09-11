@@ -218,9 +218,34 @@ describe('LessonKitsService', () => {
       expect(status).toEqual({
         status: LessonKitStatus.GENERATING,
         current_step: 'phase1',
-        progress_percent: 30,
+        progress_percent: 5,
         generation_time_ms: 5000,
       });
+    });
+
+    it('should return granular progress for each sub-step', async () => {
+      const steps = [
+        { step: 'phase1_vocabulary', expected: 10 },
+        { step: 'phase1_expressions', expected: 20 },
+        { step: 'phase1_activities', expected: 30 },
+        { step: 'phase2_script', expected: 55 },
+        { step: 'phase3_questions', expected: 75 },
+        { step: 'phase3_assessment', expected: 90 },
+      ];
+
+      for (const { step, expected } of steps) {
+        mockLessonKitModel.findById.mockReturnValue({
+          exec: jest.fn().mockResolvedValue({
+            _id: 'kit_123',
+            status: LessonKitStatus.GENERATING,
+            current_step: step,
+            generation_time_ms: 5000,
+          }),
+        });
+
+        const status = await service.getStatus('kit_123');
+        expect(status.progress_percent).toBe(expected);
+      }
     });
 
     it('should return 100% when completed', async () => {
