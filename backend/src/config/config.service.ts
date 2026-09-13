@@ -20,7 +20,7 @@ export class LessonConfigService {
   constructor(
     @InjectModel(LessonContent.name)
     private readonly lessonContentModel: Model<LessonContentDocument>,
-  ) { }
+  ) {}
 
   async getSubjects() {
     const subjects: string[] = await this.lessonContentModel

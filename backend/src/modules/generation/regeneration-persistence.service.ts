@@ -121,7 +121,9 @@ export class RegenerationPersistenceService {
         }
         const errMsg = (err as Error)?.message || '';
         const isTxUnsupported =
-          errMsg.includes('Transaction numbers are only allowed on a replica set member or mongos') ||
+          errMsg.includes(
+            'Transaction numbers are only allowed on a replica set member or mongos',
+          ) ||
           errMsg.includes('Transactions are not supported') ||
           errMsg.includes('replica set');
         if (!isTxUnsupported) {

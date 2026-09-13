@@ -26,7 +26,6 @@ interface StudentQuestionResponse {
   student_questions?: unknown;
 }
 
-
 @Injectable()
 export class StudentQuestionsService implements ComponentGenerator<
   StudentQuestion,
@@ -39,7 +38,7 @@ export class StudentQuestionsService implements ComponentGenerator<
     private readonly studentQuestionModel: Model<StudentQuestionDocument>,
     private readonly aiService: AiService,
     private readonly aiLogsService: AiLogsService,
-  ) { }
+  ) {}
 
   // -------------------------------------------------------------------------
   // generate

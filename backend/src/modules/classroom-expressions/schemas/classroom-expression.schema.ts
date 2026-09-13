@@ -3,7 +3,6 @@ import { Document, Types } from 'mongoose';
 
 export type ClassroomExpressionDocument = ClassroomExpression & Document;
 
-
 export enum ExpressionCategory {
   OPENING = 'opening',
   CONTENT_INTRO = 'content_intro',

@@ -52,6 +52,28 @@ export interface RegenerateResult {
   data: unknown[];
 }
 
+export interface RegenerateAllStaleResult {
+  lesson_kit_id: string;
+  status: 'completed' | 'partial';
+  regenerated: ComponentType[];
+  failed: { component: ComponentType; error: string }[];
+  remaining_stale: ComponentType[];
+}
+
+/**
+ * Topological order for regeneration phases.
+ * Phase 1 components (independent) → Phase 2 (script) → Phase 3 (questions, assessment).
+ */
+const REGENERATION_PHASES: ComponentType[][] = [
+  [
+    ComponentType.VOCABULARY,
+    ComponentType.EXPRESSIONS,
+    ComponentType.ACTIVITIES,
+  ],
+  [ComponentType.SCRIPT],
+  [ComponentType.QUESTIONS, ComponentType.ASSESSMENT],
+];
+
 @Injectable()
 export class RegenerateService {
   private readonly logger = new Logger(RegenerateService.name);
@@ -247,6 +269,124 @@ export class RegenerateService {
       stale_components: persisted.staleComponents,
       data: persisted.data,
     };
+  }
+
+  /**
+   * Regenerates all stale components for a lesson kit in the correct
+   * dependency order (topological sort by generation phase).
+   *
+   * Phase 1 (parallel): vocabulary, expressions, activities
+   * Phase 2:            script
+   * Phase 3 (parallel): questions, assessment
+   *
+   * If a component in an earlier phase fails, downstream dependents
+   * in later phases are skipped, but independent components continue.
+   */
+  async regenerateAllStale(
+    lessonKitId: string,
+  ): Promise<RegenerateAllStaleResult> {
+    // 1. Fetch kit and validate
+    const kit = await this.lessonKitsService.findById(lessonKitId);
+    if (!kit) {
+      throw new NotFoundException(
+        `Lesson Kit with ID "${lessonKitId}" not found`,
+      );
+    }
+    if (kit.status === LessonKitStatus.GENERATING) {
+      throw new ConflictException(
+        'Cannot regenerate while Lesson Kit is actively generating.',
+      );
+    }
+
+    const staleSet = new Set<ComponentType>(
+      (kit.stale_components ?? []).filter((c): c is ComponentType =>
+        Object.values(ComponentType).includes(c as ComponentType),
+      ),
+    );
+
+    if (staleSet.size === 0) {
+      return {
+        lesson_kit_id: lessonKitId,
+        status: 'completed',
+        regenerated: [],
+        failed: [],
+        remaining_stale: [],
+      };
+    }
+
+    // 2. Build ordered phases from stale components
+    const phases = this.sortStaleByPhase(staleSet);
+
+    this.logger.log(
+      `Regenerating all stale for kit ${lessonKitId}: ${phases.map((p) => `[${p.join(', ')}]`).join(' → ')}`,
+    );
+
+    const regenerated: ComponentType[] = [];
+    const failed: { component: ComponentType; error: string }[] = [];
+    const skipped = new Set<ComponentType>();
+
+    // 3. Execute phases sequentially; within each phase, run in parallel
+    for (const phase of phases) {
+      const toRun = phase.filter((c) => !skipped.has(c));
+      if (toRun.length === 0) continue;
+
+      const results = await Promise.allSettled(
+        toRun.map(async (component) => {
+          await this.regenerate(lessonKitId, component);
+          return component;
+        }),
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          regenerated.push(result.value);
+        } else {
+          const failedComponent = toRun[results.indexOf(result)];
+          const errorMsg =
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason);
+          failed.push({ component: failedComponent, error: errorMsg });
+
+          // Mark downstream dependents as skipped
+          const downstream = STALE_DEPENDENCIES_MAP[failedComponent] ?? [];
+          for (const dep of downstream) {
+            if (staleSet.has(dep)) {
+              skipped.add(dep);
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Compute remaining stale
+    const remaining = [...staleSet].filter((c) => !regenerated.includes(c));
+
+    this.logger.log(
+      `Regenerate-all-stale for kit ${lessonKitId}: ` +
+        `regenerated=[${regenerated.join(', ')}], ` +
+        `failed=[${failed.map((f) => f.component).join(', ')}], ` +
+        `remaining=[${remaining.join(', ')}]`,
+    );
+
+    return {
+      lesson_kit_id: lessonKitId,
+      status: failed.length === 0 ? 'completed' : 'partial',
+      regenerated,
+      failed,
+      remaining_stale: remaining,
+    };
+  }
+
+  /**
+   * Groups stale components into ordered phases based on the generation
+   * pipeline dependency graph. Only includes phases that contain at least
+   * one stale component.
+   */
+  private sortStaleByPhase(staleSet: Set<ComponentType>): ComponentType[][] {
+    return REGENERATION_PHASES.map((phase) =>
+      phase.filter((c) => staleSet.has(c)),
+    ).filter((phase) => phase.length > 0);
   }
 
   /**

@@ -90,15 +90,22 @@ export class AssessmentsService implements ComponentGenerator<
 
         // Pre-sanitize matching correct_answer (semicolon, colon, extra text)
         for (const item of items) {
-          if (
-            this.isRecord(item) &&
-            item.question_type === 'matching' &&
-            typeof item.correct_answer === 'string'
-          ) {
-            let cleaned = item.correct_answer.replace(/\([^)]*\)/g, '');
-            cleaned = cleaned.replace(/;/g, ',');
-            cleaned = cleaned.replace(/(\d+)\s*[:.]\s*([a-zA-Z])/g, '$1-$2');
-            item.correct_answer = cleaned.trim();
+          if (this.isRecord(item)) {
+            if (
+              item.question_type === 'matching' &&
+              typeof item.correct_answer === 'string'
+            ) {
+              let cleaned = item.correct_answer.replace(/\([^)]*\)/g, '');
+              cleaned = cleaned.replace(/;/g, ',');
+              cleaned = cleaned.replace(/(\d+)\s*[:.]\s*([a-zA-Z])/g, '$1-$2');
+              item.correct_answer = cleaned.trim();
+            }
+            if (!item.explanation_vn && item.explanation_vi) {
+              item.explanation_vn = item.explanation_vi;
+            }
+            if (!item.explanation_en && item.explanation) {
+              item.explanation_en = item.explanation;
+            }
           }
         }
 
@@ -192,9 +199,20 @@ export class AssessmentsService implements ComponentGenerator<
         }
       }
 
-      // explanation
-      if (typeof item.explanation !== 'string' || !item.explanation.trim()) {
-        errors.push(`${prefix}: Missing or empty "explanation".`);
+      // explanation_en
+      if (
+        typeof item.explanation_en !== 'string' ||
+        !item.explanation_en.trim()
+      ) {
+        errors.push(`${prefix}: Missing or empty "explanation_en".`);
+      }
+
+      // explanation_vn
+      if (
+        typeof item.explanation_vn !== 'string' ||
+        !item.explanation_vn.trim()
+      ) {
+        errors.push(`${prefix}: Missing or empty "explanation_vn".`);
       }
 
       // sort_order: positive integer and continuous sequence

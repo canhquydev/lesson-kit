@@ -4,10 +4,7 @@ import { BaseResponseDto } from '../../common/dto';
 
 @Controller('api/lessons')
 export class LessonContentsController {
-  constructor(
-    private readonly lessonContentsService: LessonContentsService,
-  ) { }
-
+  constructor(private readonly lessonContentsService: LessonContentsService) {}
 
   @Get()
   async findAll(

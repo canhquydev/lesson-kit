@@ -108,11 +108,11 @@ describe('LessonKitsService', () => {
       const execMock = jest.fn().mockResolvedValue(mockKits);
       const limitMock = jest.fn().mockReturnValue({ exec: execMock });
       const skipMock = jest.fn().mockReturnValue({ limit: limitMock });
-      
+
       mockLessonKitModel.find.mockReturnValue({
         sort: jest.fn().mockReturnValue({ skip: skipMock }),
       });
-      
+
       mockLessonKitModel.countDocuments = jest.fn().mockReturnValue({
         exec: jest.fn().mockResolvedValue(2),
       });
@@ -282,12 +282,14 @@ describe('LessonKitsService', () => {
         withTransaction: jest.fn().mockImplementation(async (cb) => await cb()),
         endSession: jest.fn(),
       };
-      mockLessonKitModel.db.startSession = jest.fn().mockResolvedValue(mockSession);
+      mockLessonKitModel.db.startSession = jest
+        .fn()
+        .mockResolvedValue(mockSession);
 
       mockLessonKitModel.findById.mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockKit),
       });
-      
+
       const sessionExecMock = jest.fn().mockResolvedValue(mockKit);
       mockLessonKitModel.findByIdAndDelete.mockReturnValue({
         session: jest.fn().mockReturnValue({ exec: sessionExecMock }),

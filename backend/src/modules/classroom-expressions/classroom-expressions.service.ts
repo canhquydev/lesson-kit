@@ -17,9 +17,7 @@ import {
 import { GenerationContext } from '../../common/interfaces';
 
 @Injectable()
-export class ClassroomExpressionsService
-  implements ComponentGenerator<ClassroomExpressionDocument>
-{
+export class ClassroomExpressionsService implements ComponentGenerator<ClassroomExpressionDocument> {
   private readonly logger = new Logger(ClassroomExpressionsService.name);
 
   constructor(

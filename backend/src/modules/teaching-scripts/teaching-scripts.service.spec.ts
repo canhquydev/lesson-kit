@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { GenerationContext } from '../../common/interfaces';
 import { ValidationError } from '../../common/validators';
 import { AiService, ChatMessage } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { TeachingScriptItemDto } from './dto';
 import { TeachingScript } from './schemas/teaching-script.schema';
 import { TeachingScriptsService } from './teaching-scripts.service';
@@ -124,6 +125,10 @@ describe('TeachingScriptsService', () => {
         {
           provide: AiService,
           useValue: { generateJson },
+        },
+        {
+          provide: AiLogsService,
+          useValue: { logError: jest.fn() },
         },
       ],
     }).compile();

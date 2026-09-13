@@ -80,8 +80,7 @@ export class TeachingScriptsService implements ComponentGenerator<
 
         return items;
       },
-      (data: unknown[]) =>
-        this.validateForGeneration(data, context, resolved),
+      (data: unknown[]) => this.validateForGeneration(data, context, resolved),
       3,
       (attempt, errors, rawData) => {
         this.aiLogsService.logError({

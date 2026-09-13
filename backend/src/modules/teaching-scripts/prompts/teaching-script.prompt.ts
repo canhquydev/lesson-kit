@@ -28,8 +28,8 @@ export interface TeachingActivityPromptItem {
   description?: string;
   objective?: string;
   group_type?: string;
-  instructions?: string;
-  english_instructions?: string;
+  instructions_en?: string;
+  instructions_vn?: string;
   student_task?: string;
   expected_outcome?: string;
 }
@@ -81,14 +81,17 @@ export function buildStepSkeleton(
   let remaining = totalDuration - activitySum;
 
   // Safety net: nếu activities chiếm quá nhiều, scale down proportionally
-  const mutableActivities = activities.map(a => ({ ...a }));
+  const mutableActivities = activities.map((a) => ({ ...a }));
   if (remaining < 5) {
     const maxActivityTime = Math.floor(totalDuration * 0.6);
     const scale = maxActivityTime / Math.max(activitySum, 1);
     for (const a of mutableActivities) {
       a.duration_minutes = Math.max(2, Math.round(a.duration_minutes * scale));
     }
-    const newSum = mutableActivities.reduce((s, a) => s + a.duration_minutes, 0);
+    const newSum = mutableActivities.reduce(
+      (s, a) => s + a.duration_minutes,
+      0,
+    );
     remaining = totalDuration - newSum;
   }
 
@@ -181,8 +184,7 @@ Hãy sửa toàn bộ lỗi trên trong kết quả mới.
 function formatSkeleton(steps: StepSkeleton[]): string {
   const total = steps.reduce((sum, s) => sum + s.duration_minutes, 0);
   const lines = steps.map((s) => {
-    const tag =
-      s.role === 'activity' ? ' (Activity Phase 1)' : '';
+    const tag = s.role === 'activity' ? ' (Activity Phase 1)' : '';
     return `  Step ${s.step_order}: "${s.activity_name}" — ${s.duration_minutes} phút${tag}`;
   });
   lines.push(`  TỔNG: ${total} phút ✓`);
@@ -262,4 +264,3 @@ ${skeleton
 }
 ${formatRetryErrors(retryErrors)}`;
 }
-

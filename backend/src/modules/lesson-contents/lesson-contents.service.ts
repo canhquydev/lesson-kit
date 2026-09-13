@@ -11,7 +11,7 @@ export class LessonContentsService {
   constructor(
     @InjectModel(LessonContent.name)
     private readonly lessonContentModel: Model<LessonContentDocument>,
-  ) { }
+  ) {}
 
   async findBySubjectAndGrade(
     subject: string,

@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AiService } from './ai.service';
-import OpenAI from 'openai';
 
 describe('AiService', () => {
   let service: AiService;
@@ -38,7 +37,7 @@ describe('AiService', () => {
     }).compile();
 
     service = module.get<AiService>(AiService);
-    service.setClient(mockOpenAIClient as unknown as OpenAI);
+    service.setClient(mockOpenAIClient);
     // Speed up delay for tests
     (service as any).delay = jest.fn().mockResolvedValue(undefined);
   });
@@ -54,9 +53,10 @@ describe('AiService', () => {
     });
 
     const messages = [{ role: 'user' as const, content: 'Generate JSON' }];
-    const result = await service.generateJson<{ result: string; items: number[] }>(
-      messages,
-    );
+    const result = await service.generateJson<{
+      result: string;
+      items: number[];
+    }>(messages);
 
     expect(result).toEqual(mockOutput);
     expect(mockOpenAIClient.chat.completions.create).toHaveBeenCalledTimes(1);
@@ -111,9 +111,9 @@ describe('AiService', () => {
     mockOpenAIClient.chat.completions.create.mockRejectedValue(networkError);
 
     const messages = [{ role: 'user' as const, content: 'Generate JSON' }];
-    await expect(service.generateJson(messages, { maxRetries: 3 })).rejects.toThrow(
-      'Network timeout',
-    );
+    await expect(
+      service.generateJson(messages, { maxRetries: 3 }),
+    ).rejects.toThrow('Network timeout');
     expect(mockOpenAIClient.chat.completions.create).toHaveBeenCalledTimes(3);
   });
 });

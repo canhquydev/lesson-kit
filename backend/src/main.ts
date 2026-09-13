@@ -27,4 +27,4 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Server running on http://localhost:${port}`);
 }
-bootstrap();
+void bootstrap();

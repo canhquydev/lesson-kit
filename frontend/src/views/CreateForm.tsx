@@ -1,115 +1,182 @@
-import { useEffect, useMemo, useState } from "react";
-import { Combobox, Card, Skeleton, toast } from "../components/ui";
-import { ArrowLeft, ArrowRight, Globe, Sparkle } from "../components/icons";
-import { getSubjects, getLessons, getOptions, generateLessonKit } from "../lib/api";
-import type { Subject, LessonItem, SupportLevel } from "../lib/types";
-import type { FormData } from "../App";
+import { useEffect, useMemo, useState } from "react"
+
+import { Combobox, Card, Skeleton, toast } from "../components/ui"
+
+import { ArrowLeft, ArrowRight, Globe, Sparkle } from "../components/icons"
+
+import {
+  getSubjects,
+  getLessons,
+  getOptions,
+  generateLessonKit,
+} from "../lib/api"
+
+import type { Subject, LessonItem, SupportLevel } from "../lib/types"
+
+import type { FormData } from "../App"
 
 // Map backend subject code → display name
+
 const SUBJECT_NAMES: Record<string, string> = {
   VAT_LI: "Vật lí",
+
   HOA_HOC: "Hóa học",
+
   SINH_HOC: "Sinh học",
+
   TOAN: "Toán",
-};
+}
 
 // Map CEFR levels → Vietnamese display names
+
 const CEFR_NAMES: Record<string, string> = {
   A1: "A1 - Mới bắt đầu",
+
   A2: "A2 - Sơ cấp",
+
   B1: "B1 - Trung cấp",
+
   B2: "B2 - Trung cấp trên",
+
   C1: "C1 - Cao cấp",
+
   C2: "C2 - Thành thạo",
-};
+}
 
 export function CreateForm({
   onBack,
+
   onGenerate,
 }: {
-  onBack: () => void;
-  onGenerate: (kitId: string, data: FormData) => void;
+  onBack: () => void
+
+  onGenerate: (kitId: string, data: FormData) => void
 }) {
   // ─── API data ───
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [lessons, setLessons] = useState<LessonItem[]>([]);
-  const [durations, setDurations] = useState<number[]>([35, 40, 45]);
-  const [supportLevels, setSupportLevels] = useState<SupportLevel[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+
+  const [subjects, setSubjects] = useState<Subject[]>([])
+
+  const [lessons, setLessons] = useState<LessonItem[]>([])
+
+  const [durations, setDurations] = useState<number[]>([35, 40, 45])
+
+  const [supportLevels, setSupportLevels] = useState<SupportLevel[]>([])
+
+  const [loading, setLoading] = useState(true)
+
+  const [generating, setGenerating] = useState(false)
 
   // ─── Form state ───
-  const [subject, setSubject] = useState("");
-  const [grade, setGrade] = useState("10");
-  const [lessonId, setLessonId] = useState("");
-  const [duration, setDuration] = useState("45");
-  const [cefr, setCefr] = useState("B1");
+
+  const [subject, setSubject] = useState("")
+
+  const [grade, setGrade] = useState("10")
+
+  const [lessonId, setLessonId] = useState("")
+
+  const [duration, setDuration] = useState("45")
+
+  const [cefr, setCefr] = useState("B1")
 
   // ─── Load subjects + options on mount ───
+
   useEffect(() => {
     Promise.all([getSubjects(), getOptions()])
+
       .then(([subs, opts]) => {
-        setSubjects(subs);
-        setDurations(opts.durations);
-        setSupportLevels(opts.support_levels);
-        if (subs.length > 0) setSubject(subs[0].code);
+        setSubjects(subs)
+
+        setDurations(opts.durations)
+
+        setSupportLevels(opts.support_levels)
+
+        if (subs.length > 0) setSubject(subs[0].code)
       })
+
       .catch(() => toast("Không thể tải cấu hình", "error"))
-      .finally(() => setLoading(false));
-  }, []);
+
+      .finally(() => setLoading(false))
+  }, [])
 
   // ─── Load lessons when subject/grade changes ───
+
   useEffect(() => {
-    if (!subject || !grade) return;
-    setLessonId("");
+    if (!subject || !grade) return
+
+    setLessonId("")
+
     getLessons(subject, grade)
+
       .then(setLessons)
-      .catch(() => setLessons([]));
-  }, [subject, grade]);
+
+      .catch(() => setLessons([]))
+  }, [subject, grade])
 
   // ─── Derived ───
-  const selectedLesson = lessons.find((l) => l._id === lessonId);
+
+  const selectedLesson = lessons.find((l) => l._id === lessonId)
+
   const subjectOptions = subjects.map((s) => ({
     value: s.code,
+
     label: SUBJECT_NAMES[s.code] || s.name,
-  }));
+  }))
+
   const gradeOptions = ["10", "11", "12"].map((g) => ({
     value: g,
+
     label: `Lớp ${g}`,
-  }));
+  }))
+
   const lessonOptions = useMemo(
     () => lessons.map((l) => ({ value: l._id, label: l.title })),
+
     [lessons],
-  );
+  )
+
   const durationOptions = durations.map((d) => ({
     value: String(d),
+
     label: `${d} phút`,
-  }));
+  }))
+
   const cefrOptions = supportLevels.map((s) => ({
     value: s.code,
-    label: CEFR_NAMES[s.code] || s.name,
-  }));
 
-  const ready = subject && grade && lessonId && duration && cefr && !generating;
+    label: CEFR_NAMES[s.code] || s.name,
+  }))
+
+  const ready = subject && grade && lessonId && duration && cefr && !generating
 
   async function handleGenerate() {
-    if (!selectedLesson) return;
-    setGenerating(true);
+    if (!selectedLesson) return
+
+    setGenerating(true)
+
     try {
       const data: FormData = {
         subject,
+
         grade,
+
         lesson_topic: selectedLesson.title,
+
         lesson_content_id: lessonId,
+
         duration: parseInt(duration, 10),
+
         support_level: cefr,
-      };
-      const res = await generateLessonKit(data);
-      toast("Đang tạo Lesson Kit...", "success");
-      onGenerate(res.lesson_kit_id, data);
+      }
+
+      const res = await generateLessonKit(data)
+
+      toast("Đang tạo Lesson Kit...", "success")
+
+      onGenerate(res.lesson_kit_id, data)
     } catch (err: unknown) {
-      toast(err instanceof Error ? err.message : "Lỗi khi tạo kit", "error");
-      setGenerating(false);
+      toast(err instanceof Error ? err.message : "Lỗi khi tạo kit", "error")
+
+      setGenerating(false)
     }
   }
 
@@ -130,7 +197,7 @@ export function CreateForm({
           <Skeleton className="h-14 rounded-xl" />
         </Card>
       </div>
-    );
+    )
   }
 
   return (
@@ -153,7 +220,8 @@ export function CreateForm({
                 Chuẩn bị bài giảng
               </h1>
               <p className="text-[13px] text-slate-500">
-                AI chuẩn bị sẵn tài nguyên để bạn có thể sử dụng tiếng Anh trong lớp học.
+                AI chuẩn bị sẵn tài nguyên để bạn có thể sử dụng tiếng Anh trong
+                lớp học.
               </p>
             </div>
           </div>
@@ -164,8 +232,9 @@ export function CreateForm({
                 label="Môn học"
                 value={subject}
                 onChange={(v) => {
-                  setSubject(v);
-                  setLessonId("");
+                  setSubject(v)
+
+                  setLessonId("")
                 }}
                 options={subjectOptions}
               />
@@ -173,8 +242,9 @@ export function CreateForm({
                 label="Khối lớp"
                 value={grade}
                 onChange={(v) => {
-                  setGrade(v);
-                  setLessonId("");
+                  setGrade(v)
+
+                  setLessonId("")
                 }}
                 options={gradeOptions}
               />
@@ -226,5 +296,5 @@ export function CreateForm({
         </Card>
       </div>
     </div>
-  );
+  )
 }

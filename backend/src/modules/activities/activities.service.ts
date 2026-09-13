@@ -22,9 +22,7 @@ import { GenerationContext } from '../../common/interfaces';
  * Triển khai ComponentGenerator theo chuẩn kiến trúc Lesson Kit Generator
  */
 @Injectable()
-export class ActivitiesService
-  implements ComponentGenerator<ActivityDocument>
-{
+export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
   private readonly logger = new Logger(ActivitiesService.name);
 
   constructor(
@@ -81,6 +79,8 @@ export class ActivitiesService
 
     return rawActivities.map((item, index) => ({
       ...item,
+      instructions_en: this.normalizeInstructions(item.instructions_en),
+      instructions_vn: this.normalizeInstructions(item.instructions_vn),
       sort_order: item.sort_order ?? index + 1,
     })) as ActivityDocument[];
   }
@@ -92,7 +92,7 @@ export class ActivitiesService
    * - activity_type phải thuộc 10 hình thức cho phép.
    * - group_type phải thuộc 4 kiểu: individual, pair, group, whole_class.
    * - duration_minutes phải > 0.
-   * - Bắt buộc đầy đủ các trường: activity_name, description, objective, instructions, english_instructions, student_task, expected_outcome.
+   * - Bắt buộc đầy đủ các trường: activity_name, description, objective, instructions_en, instructions_vn, student_task, expected_outcome.
    */
   validate(data: any[]): ValidationResult {
     const errors: string[] = [];
@@ -165,23 +165,37 @@ export class ActivitiesService
       }
 
       if (
-        !item?.instructions ||
-        typeof item.instructions !== 'string' ||
-        !item.instructions.trim()
+        !item?.instructions_en ||
+        typeof item.instructions_en !== 'string' ||
+        !item.instructions_en.trim()
       ) {
         errors.push(
-          `${prefix}: Missing or empty "instructions" (teacher guidelines).`,
+          `${prefix}: Missing or empty "instructions_en" (teacher guidelines in English).`,
         );
+      } else {
+        const stepCount = this.countSteps(item.instructions_en);
+        if (stepCount < 2) {
+          errors.push(
+            `${prefix}: "instructions_en" must contain at least 2 distinct numbered steps (found ${stepCount}). Use "1. ...\n2. ..." format.`,
+          );
+        }
       }
 
       if (
-        !item?.english_instructions ||
-        typeof item.english_instructions !== 'string' ||
-        !item.english_instructions.trim()
+        !item?.instructions_vn ||
+        typeof item.instructions_vn !== 'string' ||
+        !item.instructions_vn.trim()
       ) {
         errors.push(
-          `${prefix}: Missing or empty "english_instructions" (teacher spoken English).`,
+          `${prefix}: Missing or empty "instructions_vn" (teacher guidelines in Vietnamese).`,
         );
+      } else {
+        const stepCount = this.countSteps(item.instructions_vn);
+        if (stepCount < 2) {
+          errors.push(
+            `${prefix}: "instructions_vn" must contain at least 2 distinct numbered steps (found ${stepCount}). Use "1. ...\n2. ..." format.`,
+          );
+        }
       }
 
       if (
@@ -256,8 +270,8 @@ ${context.content}
 2. Phục vụ mục tiêu: Hoạt động phải phục vụ trực tiếp mục tiêu kiến thức và kỹ năng của bài học, không đơn thuần chơi cho vui.
 3. Thời lượng hợp lý: Tổng thời lượng tiết học là ${context.duration} phút. Hãy tự cân đối thời lượng mỗi hoạt động dựa trên tính chất bài học (bài thực hành → hoạt động nhiều hơn, bài lý thuyết → hoạt động ít hơn). QUAN TRỌNG: Phải chừa đủ thời gian (tối thiểu 8 phút) cho các phần khác trong tiết như mở bài (warm-up), kiểm tra đánh giá (assessment) và tổng kết (wrap-up) — tức tổng thời lượng activities KHÔNG được bằng toàn bộ thời lượng tiết.
 4. Hình thức nhóm (group_type): Chọn một trong các giá trị sau: individual | pair | group | whole_class.
-5. Hướng dẫn chi tiết (instructions): Các bước rõ ràng cho giáo viên tổ chức từ chuẩn bị đến thực hiện và kết luận.
-6. Lời nói tiếng Anh (english_instructions): Câu tiếng Anh khẩu ngữ giáo viên dùng để giao nhiệm vụ hoặc điều hành hoạt động.
+5. Hướng dẫn chi tiết tiếng Anh (instructions_en): Các bước rõ ràng bằng tiếng Anh cho giáo viên tổ chức từ chuẩn bị đến thực hiện và kết luận. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n) giữa các bước. VD: "1. Prepare cards...\n2. Divide students...\n3. Ask them to...".
+6. Hướng dẫn chi tiết tiếng Việt (instructions_vn): Bản tiếng Việt tương ứng của instructions_en. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n). VD: "1. Chuẩn bị...\n2. Chia nhóm...\n3. Yêu cầu...\n4. Tổng kết...".
 7. Nhiệm vụ học sinh (student_task): Mô tả rõ học sinh phải làm gì, thảo luận gì hoặc giải quyết vấn đề gì.
 8. Kết quả mong đợi (expected_outcome): Nêu rõ sản phẩm hoặc kết quả cụ thể học sinh đạt được.
 
@@ -272,8 +286,8 @@ Trả về đối tượng JSON duy nhất có cấu trúc:
       "objective": "mục tiêu sư phạm cụ thể",
       "duration_minutes": 8,
       "group_type": "individual | pair | group | whole_class",
-      "instructions": "1. Đặt câu hỏi... 2. Hướng dẫn thảo luận... 3. Nhận xét...",
-      "english_instructions": "câu lệnh tiếng Anh giáo viên dùng",
+      "instructions_en": "1. Prepare: Hand out the worksheet to each group.\n2. Divide: Split the class into 4 groups of 4-5 students.\n3. Instruct: Ask students to match the terms with their definitions.\n4. Wrap up: Have a representative from each group present.",
+      "instructions_vn": "1. Chuẩn bị: Phát phiếu bài tập cho mỗi nhóm.\n2. Chia nhóm: Chia lớp thành 4 nhóm, mỗi nhóm 4-5 học sinh.\n3. Yêu cầu: Học sinh thảo luận và ghép đôi các thuật ngữ.\n4. Tổng kết: Gọi đại diện nhóm trình bày kết quả.",
       "student_task": "nhiệm vụ cụ thể học sinh làm",
       "expected_outcome": "kết quả cụ thể học sinh trình bày được"
     }
@@ -289,6 +303,33 @@ ${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
     }
 
     return prompt;
+  }
+
+  /**
+   * Normalize instruction text: ensure each numbered step is on its own line.
+   * Handles both already-newlined and inline "1. xxx 2. yyy" formats.
+   */
+  private normalizeInstructions(text: string): string {
+    if (!text || typeof text !== 'string') return text;
+
+    // If already has newlines between steps, trim and return
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length > 1) return lines.join('\n');
+
+    // Split inline numbered steps: "1. xxx 2. yyy" → "1. xxx\n2. yyy"
+    return text.replace(/\s+(\d+)\.\s/g, '\n$1. ').trim();
+  }
+
+  /**
+   * Count the number of distinct numbered steps in instruction text.
+   */
+  private countSteps(text: string): number {
+    if (!text) return 0;
+    const matches = text.match(/(?:^|\n)\s*\d+\./g);
+    return matches ? matches.length : text.trim() ? 1 : 0;
   }
 
   /**

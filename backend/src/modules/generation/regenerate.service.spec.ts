@@ -442,4 +442,99 @@ describe('RegenerateService', () => {
       );
     });
   });
+
+  describe('regenerateAllStale', () => {
+    it('returns completed with empty arrays when no stale components', async () => {
+      lessonKitsService.findById.mockResolvedValueOnce({
+        ...mockLessonKit,
+        stale_components: [],
+      });
+
+      const result = await service.regenerateAllStale(kitId);
+
+      expect(result.status).toBe('completed');
+      expect(result.regenerated).toEqual([]);
+      expect(result.failed).toEqual([]);
+      expect(result.remaining_stale).toEqual([]);
+    });
+
+    it('regenerates stale components in correct phase order (script before questions/assessment)', async () => {
+      lessonKitsService.findById.mockResolvedValueOnce({
+        ...mockLessonKit,
+        stale_components: [
+          ComponentType.ASSESSMENT,
+          ComponentType.SCRIPT,
+          ComponentType.QUESTIONS,
+        ],
+      });
+
+      // Track call order
+      const callOrder: string[] = [];
+      teachingScriptsService.generate.mockImplementation(() => {
+        callOrder.push('script');
+        return Promise.resolve(mockScripts);
+      });
+      studentQuestionsService.generate.mockImplementation(() => {
+        callOrder.push('questions');
+        return Promise.resolve(mockQuestions);
+      });
+      assessmentsService.generate.mockImplementation(() => {
+        callOrder.push('assessment');
+        return Promise.resolve(mockAssessments);
+      });
+
+      const result = await service.regenerateAllStale(kitId);
+
+      expect(result.status).toBe('completed');
+      expect(result.regenerated).toContain(ComponentType.SCRIPT);
+      expect(result.regenerated).toContain(ComponentType.QUESTIONS);
+      expect(result.regenerated).toContain(ComponentType.ASSESSMENT);
+
+      // Script must be called before questions and assessment
+      const scriptIdx = callOrder.indexOf('script');
+      const questionsIdx = callOrder.indexOf('questions');
+      const assessmentIdx = callOrder.indexOf('assessment');
+      expect(scriptIdx).toBeLessThan(questionsIdx);
+      expect(scriptIdx).toBeLessThan(assessmentIdx);
+    });
+
+    it('skips downstream components when an upstream component fails', async () => {
+      lessonKitsService.findById.mockResolvedValueOnce({
+        ...mockLessonKit,
+        stale_components: [
+          ComponentType.SCRIPT,
+          ComponentType.QUESTIONS,
+          ComponentType.ASSESSMENT,
+        ],
+      });
+
+      // Script generation fails
+      teachingScriptsService.generate.mockRejectedValueOnce(
+        new Error('AI service unavailable'),
+      );
+
+      const result = await service.regenerateAllStale(kitId);
+
+      expect(result.status).toBe('partial');
+      expect(result.regenerated).toEqual([]);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].component).toBe(ComponentType.SCRIPT);
+      // Questions and assessment should be skipped (they depend on script)
+      expect(result.remaining_stale).toContain(ComponentType.SCRIPT);
+      expect(result.remaining_stale).toContain(ComponentType.QUESTIONS);
+      expect(result.remaining_stale).toContain(ComponentType.ASSESSMENT);
+    });
+
+    it('rejects when kit is in GENERATING status', async () => {
+      lessonKitsService.findById.mockResolvedValueOnce({
+        ...mockLessonKit,
+        status: LessonKitStatus.GENERATING,
+        stale_components: [ComponentType.SCRIPT],
+      });
+
+      await expect(service.regenerateAllStale(kitId)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+  });
 });

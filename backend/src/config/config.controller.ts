@@ -4,7 +4,7 @@ import { BaseResponseDto } from '../common/dto';
 
 @Controller('api/config')
 export class LessonConfigController {
-  constructor(private readonly lessonConfigService: LessonConfigService) { }
+  constructor(private readonly lessonConfigService: LessonConfigService) {}
 
   @Get('subjects')
   async getSubjects() {

@@ -17,7 +17,6 @@ export interface CompletionOptions {
   maxRetries?: number;
 }
 
-
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -30,7 +29,8 @@ export class AiService {
   constructor(private readonly configService: ConfigService) {
     const apiKey =
       this.configService.get<string>('OPENAI_API_KEY') || 'mock-api-key';
-    const baseURL = this.configService.get<string>('OPENAI_BASE_URL') || undefined;
+    const baseURL =
+      this.configService.get<string>('OPENAI_BASE_URL') || undefined;
 
     this.defaultModel =
       this.configService.get<string>('OPENAI_MODEL') || 'deepseek-chat';
@@ -101,7 +101,7 @@ export class AiService {
 
         this.logger.warn(
           `AI request failed on attempt ${attempt}/${maxRetries}: ${error.message} ` +
-          `(rateLimit: ${isRateLimit}, network: ${isNetworkError}, jsonError: ${isJsonParseError})`,
+            `(rateLimit: ${isRateLimit}, network: ${isNetworkError}, jsonError: ${isJsonParseError})`,
         );
 
         if (attempt >= maxRetries) {

@@ -36,10 +36,7 @@ export class LessonKitsController {
   }
 
   @Get()
-  async findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  async findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const data = await this.lessonKitsService.findAll(pageNum, limitNum);
@@ -64,6 +61,12 @@ export class LessonKitsController {
     return BaseResponseDto.ok({ id }, 'Đã xóa Lesson Kit');
   }
 
+  @Post(':id/regenerate-all-stale')
+  async regenerateAllStale(@Param('id', ParseMongoIdPipe) id: string) {
+    const result = await this.regenerateService.regenerateAllStale(id);
+    return BaseResponseDto.ok(result, 'Đã cập nhật toàn bộ phần cần thiết');
+  }
+
   @Post(':id/regenerate/:component')
   async regenerate(
     @Param('id', ParseMongoIdPipe) id: string,
@@ -73,6 +76,3 @@ export class LessonKitsController {
     return BaseResponseDto.ok(result, `Đã tạo lại ${component}`);
   }
 }
-
-
-

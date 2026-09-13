@@ -74,7 +74,8 @@ describe('GenerationService', () => {
       question_type: 'short_answer',
       options: [],
       correct_answer: 'Newton',
-      explanation: 'SI unit',
+      explanation_en: 'SI unit',
+      explanation_vn: 'Đơn vị SI',
       sort_order: 1,
     },
   ];

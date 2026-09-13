@@ -42,7 +42,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: 'String',
         options: 'Array',
         correct_answer: 'String',
-        explanation: 'String',
+        explanation_en: 'String',
+        explanation_vn: 'String',
         sort_order: 'Number',
         _id: 'ObjectId',
         createdAt: 'Date',
@@ -253,7 +254,8 @@ describe('Assessments Day 1 artifacts', () => {
           'Motion always stops',
         ],
         correct_answer: 'Acceleration increases',
-        explanation: 'Acceleration is proportional to net force.',
+        explanation_en: 'Acceleration is proportional to net force.',
+        explanation_vn: 'Gia tốc tỉ lệ thuận với hợp lực.',
         sort_order: 1,
       });
 
@@ -267,7 +269,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.TRUE_FALSE,
         options: ['True', 'False'],
         correct_answer: 'True',
-        explanation: "This is Newton's second law.",
+        explanation_en: "This is Newton's second law.",
+        explanation_vn: 'Đây là định luật 2 Newton.',
         sort_order: 2,
       });
 
@@ -281,7 +284,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.MATCHING,
         options: [],
         correct_answer: '1-b, 2-a',
-        explanation: 'Match by definition.',
+        explanation_en: 'Match by definition.',
+        explanation_vn: 'Nối theo định nghĩa.',
         sort_order: 3,
       });
 
@@ -296,7 +300,8 @@ describe('Assessments Day 1 artifacts', () => {
         options: [],
         correct_answer:
           'An object remains at rest unless acted upon by a net force.',
-        explanation: 'Law of inertia.',
+        explanation_en: 'Law of inertia.',
+        explanation_vn: 'Định luật quán tính.',
         sort_order: 4,
       });
 
@@ -310,7 +315,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: 'essay',
         options: 'not-an-array',
         correct_answer: '',
-        explanation: '',
+        explanation_en: '',
+        explanation_vn: '',
         sort_order: 0,
       });
 
@@ -325,7 +331,8 @@ describe('Assessments Day 1 artifacts', () => {
           'question_type',
           'options',
           'correct_answer',
-          'explanation',
+          'explanation_en',
+          'explanation_vn',
           'sort_order',
         ]),
       );
@@ -338,7 +345,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.MULTIPLE_CHOICE,
         options: ['A', 'B', 'C'], // only 3
         correct_answer: 'A',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -354,7 +362,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.MULTIPLE_CHOICE,
         options: ['A', 'A', 'B', 'C'], // duplicate
         correct_answer: 'A',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -370,7 +379,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.MULTIPLE_CHOICE,
         options: ['A', 'B', 'C', 'D'],
         correct_answer: 'E', // not in options
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -386,7 +396,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.TRUE_FALSE,
         options: ['Yes', 'No'], // wrong
         correct_answer: 'Yes',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -402,7 +413,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.TRUE_FALSE,
         options: ['False', 'True'], // reversed
         correct_answer: 'True',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -418,7 +430,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.MATCHING,
         options: ['A', 'B'], // should be []
         correct_answer: 'A-B',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -434,7 +447,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.SHORT_ANSWER,
         options: ['hint'], // should be []
         correct_answer: 'The answer',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -450,7 +464,8 @@ describe('Assessments Day 1 artifacts', () => {
         question_type: AssessmentQuestionType.MULTIPLE_CHOICE,
         options: ['A', 'B', 'C', 'D'],
         correct_answer: 'A',
-        explanation: 'Explanation.',
+        explanation_en: 'Explanation in English.',
+        explanation_vn: 'Giải thích tiếng Việt.',
         sort_order: 1,
       });
 
@@ -497,7 +512,8 @@ describe('Assessments Day 1 artifacts', () => {
         'question_type',
         'options',
         'correct_answer',
-        'explanation',
+        'explanation_en',
+        'explanation_vn',
         'sort_order',
       ].forEach((field) => expect(prompt).toContain(`"${field}"`));
     });

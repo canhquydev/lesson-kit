@@ -32,11 +32,16 @@ describe('LessonContentsController', () => {
   describe('findAll', () => {
     it('should return lessons from service wrapped in BaseResponseDto', async () => {
       const mockData = [{ _id: '1', title: 'Lesson 1' }];
-      mockLessonContentsService.findBySubjectAndGrade.mockResolvedValue(mockData);
+      mockLessonContentsService.findBySubjectAndGrade.mockResolvedValue(
+        mockData,
+      );
 
       const response = await controller.findAll('VAT_LI', '10');
 
-      expect(service.findBySubjectAndGrade).toHaveBeenCalledWith('VAT_LI', '10');
+      expect(service.findBySubjectAndGrade).toHaveBeenCalledWith(
+        'VAT_LI',
+        '10',
+      );
       expect(response.success).toBe(true);
       expect(response.data).toEqual(mockData);
       expect(response.message).toBe('Danh sách bài học');

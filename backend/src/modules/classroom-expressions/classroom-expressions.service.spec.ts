@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { ClassroomExpressionsService } from './classroom-expressions.service';
 import { ClassroomExpression } from './schemas/classroom-expression.schema';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { GenerationContext } from '../../common/interfaces';
 
 describe('ClassroomExpressionsService', () => {
@@ -45,7 +46,8 @@ describe('ClassroomExpressionsService', () => {
     {
       category: 'questioning',
       expression_en: 'Who can tell me what uniform motion means?',
-      translation_vi: 'Ai có thể cho cô biết chuyển động thẳng đều nghĩa là gì?',
+      translation_vi:
+        'Ai có thể cho cô biết chuyển động thẳng đều nghĩa là gì?',
       situation_note: 'Đặt câu hỏi gợi mở',
     },
     {
@@ -89,6 +91,10 @@ describe('ClassroomExpressionsService', () => {
         {
           provide: AiService,
           useValue: mockAiService,
+        },
+        {
+          provide: AiLogsService,
+          useValue: { logError: jest.fn() },
         },
       ],
     }).compile();

@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import {
-  AiErrorLog,
-  AiErrorLogDocument,
-} from './schemas/ai-error-log.schema';
+import { AiErrorLog, AiErrorLogDocument } from './schemas/ai-error-log.schema';
 
 export interface AiErrorLogEntry {
   kitId?: string;

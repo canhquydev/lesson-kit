@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -31,7 +27,8 @@ export class LessonKitsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
   ) {
-    this.aiModelVersion = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o';
+    this.aiModelVersion =
+      this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o';
   }
 
   async create(dto: CreateLessonKitDto): Promise<LessonKitDocument> {
@@ -44,7 +41,7 @@ export class LessonKitsService {
       request_id: new Types.ObjectId().toHexString(),
     });
 
-    this.logger.log(`Created lesson kit: ${lessonKit._id}`);
+    this.logger.log(`Created lesson kit: ${lessonKit._id.toString()}`);
 
     this.eventEmitter.emit('lesson-kit.generate', {
       lessonKitId: lessonKit._id.toHexString(),
@@ -53,7 +50,15 @@ export class LessonKitsService {
     return lessonKit;
   }
 
-  async findAll(page: number = 1, limit: number = 10): Promise<{ data: LessonKitDocument[], total: number, page: number, limit: number }> {
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    data: LessonKitDocument[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.lessonKitModel
@@ -62,7 +67,7 @@ export class LessonKitsService {
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.lessonKitModel.countDocuments().exec()
+      this.lessonKitModel.countDocuments().exec(),
     ]);
     return { data, total, page, limit };
   }
@@ -81,7 +86,7 @@ export class LessonKitsService {
         .collection(comp.name)
         .find({ lesson_kit_id: kitObjectId })
         .sort({ [comp.sortField]: 1 })
-        .toArray()
+        .toArray(),
     );
 
     const [
@@ -113,7 +118,9 @@ export class LessonKitsService {
     if (generationTimeMs !== undefined) {
       updateData.generation_time_ms = generationTimeMs;
     }
-    const result = await this.lessonKitModel.findByIdAndUpdate(id, updateData).exec();
+    const result = await this.lessonKitModel
+      .findByIdAndUpdate(id, updateData)
+      .exec();
     if (!result) {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
     }
@@ -130,7 +137,10 @@ export class LessonKitsService {
     this.logger.log(`Kit ${id} step → ${step}`);
   }
 
-  private calculateProgressPercent(status: LessonKitStatus, step?: string): number {
+  private calculateProgressPercent(
+    status: LessonKitStatus,
+    step?: string,
+  ): number {
     if (status === LessonKitStatus.COMPLETED) {
       return 100;
     }
@@ -195,10 +205,15 @@ export class LessonKitsService {
         await session.withTransaction(async () => {
           await Promise.all(
             LESSON_KIT_COMPONENTS.map((comp) =>
-              db.collection(comp.name).deleteMany({ lesson_kit_id: kitObjectId }, { session }),
+              db
+                .collection(comp.name)
+                .deleteMany({ lesson_kit_id: kitObjectId }, { session }),
             ),
           );
-          await this.lessonKitModel.findByIdAndDelete(id).session(session).exec();
+          await this.lessonKitModel
+            .findByIdAndDelete(id)
+            .session(session)
+            .exec();
         });
         this.logger.log(`Deleted kit ${id} and all components`);
         return;

@@ -65,7 +65,11 @@ export class AssessmentItemDto {
 
   @IsString()
   @IsNotEmpty()
-  explanation: string;
+  explanation_en: string;
+
+  @IsString()
+  @IsNotEmpty()
+  explanation_vn: string;
 
   @IsInt()
   @Min(1)

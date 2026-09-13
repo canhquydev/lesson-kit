@@ -17,4 +17,3 @@ import { GenerationModule } from '../generation/generation.module';
   exports: [LessonKitsService],
 })
 export class LessonKitsModule {}
-

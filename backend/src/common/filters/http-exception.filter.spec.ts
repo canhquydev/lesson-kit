@@ -30,7 +30,10 @@ describe('HttpExceptionFilter', () => {
   });
 
   it('should format HttpException correctly', () => {
-    const exception = new HttpException('Forbidden resource', HttpStatus.FORBIDDEN);
+    const exception = new HttpException(
+      'Forbidden resource',
+      HttpStatus.FORBIDDEN,
+    );
 
     filter.catch(exception, mockArgumentsHost);
 

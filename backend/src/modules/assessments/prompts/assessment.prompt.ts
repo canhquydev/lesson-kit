@@ -70,11 +70,21 @@ ${JSON.stringify(dependencies.activities, null, 2)}
 6. multiple_choice: options phải có đúng 4 lựa chọn khác nhau và correct_answer phải khớp một lựa chọn.
 7. true_false: options phải là ["True", "False"] và correct_answer phải là "True" hoặc "False".
 8. matching:
-   - question_text: ghi đầy đủ hai cột cần nối (Cột số: 1. ..., 2. ...; Cột chữ cái: a. ..., b. ...).
+   - question_text: BẮT BUỘC tuân thủ cấu trúc phân dòng và thẻ phân định sau:
+     [INSTRUCTION] Câu lệnh chỉ dẫn (ví dụ: Match each term in Column A with its definition in Column B)
+     [COLUMN_A]
+     1. Khái niệm 1
+     2. Khái niệm 2
+     3. Khái niệm 3
+     [COLUMN_B]
+     a. Định nghĩa A
+     b. Định nghĩa B
+     c. Định nghĩa C
+     (Mỗi mục BẮT BUỘC ở một dòng riêng biệt, Cột A đánh số 1, 2, 3... Cột B đánh chữ cái a, b, c...)
    - options: BẮT BUỘC là mảng rỗng [].
    - correct_answer: BẮT BUỘC theo định dạng chính xác "1-b, 2-a" (hoặc "1-c, 2-a, 3-b"). CÁC CẶP NGĂN CÁCH BẰNG DẤU PHẨY (,), NỐI BẰNG DẤU GẠCH NỐI (-). TUYỆT ĐỐI KHÔNG dùng dấu chấm phẩy (;), KHÔNG dùng dấu hai chấm (:), KHÔNG viết thêm từ ngữ giải thích hoặc ngoặc đơn trong correct_answer.
 9. short_answer: options phải là mảng rỗng [] và correct_answer là câu trả lời mẫu ngắn gọn.
-10. explanation phải giải thích ngắn gọn vì sao đáp án đúng.
+10. explanation_en: giải thích ngắn gọn bằng tiếng Anh vì sao đáp án đúng; explanation_vn: giải thích tương ứng bằng tiếng Việt.
 11. Kết hợp hình thức phù hợp với nội dung, khối ${context.grade} và thời lượng; sort_order liên tiếp bắt đầu từ 1.
 12. Chỉ trả về một JSON object hợp lệ, không Markdown, không giải thích ngoài JSON.
 
@@ -84,9 +94,10 @@ ${JSON.stringify(dependencies.activities, null, 2)}
     {
       "question_text": "Question in clear English",
       "question_type": "multiple_choice | true_false | matching | short_answer",
-      "options": ["multiple_choice: 4 lựa chọn | true_false: [\"True\", \"False\"] | matching và short_answer: []"],
+      "options": ["multiple_choice: 4 lựa chọn | true_false: ['True', 'False'] | matching và short_answer: []"],
       "correct_answer": "multiple_choice: đúng 1 option | true_false: 'True'/'False' | matching: ĐÚNG DẠNG '1-b, 2-a' (KHÔNG chữ thừa) | short_answer: câu trả lời",
-      "explanation": "Brief explanation",
+      "explanation_en": "Brief explanation in English",
+      "explanation_vn": "Giải thích ngắn gọn bằng tiếng Việt",
       "sort_order": 1
     }
   ]

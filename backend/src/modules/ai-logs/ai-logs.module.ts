@@ -1,9 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import {
-  AiErrorLog,
-  AiErrorLogSchema,
-} from './schemas/ai-error-log.schema';
+import { AiErrorLog, AiErrorLogSchema } from './schemas/ai-error-log.schema';
 import { AiLogsService } from './ai-logs.service';
 
 @Global()

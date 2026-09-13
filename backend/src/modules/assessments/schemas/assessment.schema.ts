@@ -57,7 +57,10 @@ export class Assessment {
   correct_answer: string;
 
   @Prop({ required: true, trim: true })
-  explanation: string;
+  explanation_en: string;
+
+  @Prop({ required: true, trim: true })
+  explanation_vn: string;
 
   @Prop({ required: true, min: 1 })
   sort_order: number;

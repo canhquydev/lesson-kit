@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LessonKitsController } from './lesson-kits.controller';
 import { LessonKitsService } from './lesson-kits.service';
-import { LessonKitStatus, SupportLevel, ComponentType } from '../../common/enums';
+import {
+  LessonKitStatus,
+  SupportLevel,
+  ComponentType,
+} from '../../common/enums';
 import { CreateLessonKitDto } from './dto';
 import { RegenerateService } from '../generation/regenerate.service';
 
@@ -131,14 +135,21 @@ describe('LessonKitsController', () => {
         component: ComponentType.VOCABULARY,
         status: 'regenerated',
         regenerated: true,
-        stale_components: [ComponentType.SCRIPT, ComponentType.QUESTIONS, ComponentType.ASSESSMENT],
+        stale_components: [
+          ComponentType.SCRIPT,
+          ComponentType.QUESTIONS,
+          ComponentType.ASSESSMENT,
+        ],
         data: [{ word: 'test' }],
       };
       mockRegenerateService.regenerate.mockResolvedValue(mockResult);
 
       const response = await controller.regenerate('kit_123', 'vocabulary');
 
-      expect(mockRegenerateService.regenerate).toHaveBeenCalledWith('kit_123', 'vocabulary');
+      expect(mockRegenerateService.regenerate).toHaveBeenCalledWith(
+        'kit_123',
+        'vocabulary',
+      );
       expect(response.success).toBe(true);
       expect(response.data).toEqual(mockResult);
     });

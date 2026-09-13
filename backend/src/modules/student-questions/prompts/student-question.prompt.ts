@@ -19,8 +19,8 @@ export interface StudentQuestionActivityInput {
   duration_minutes: number;
   description?: string;
   objective?: string;
-  instructions?: string;
-  english_instructions?: string;
+  instructions_en?: string;
+  instructions_vn?: string;
   student_task?: string;
   expected_outcome?: string;
 }

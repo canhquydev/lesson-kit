@@ -13,8 +13,7 @@ import {
 import { GenerationContext } from '../../common/interfaces';
 
 @Injectable()
-export class VocabulariesService
-  implements ComponentGenerator<VocabularyDocument> {
+export class VocabulariesService implements ComponentGenerator<VocabularyDocument> {
   private readonly logger = new Logger(VocabulariesService.name);
 
   constructor(
@@ -22,7 +21,7 @@ export class VocabulariesService
     private readonly vocabularyModel: Model<VocabularyDocument>,
     private readonly aiService: AiService,
     private readonly aiLogsService: AiLogsService,
-  ) { }
+  ) {}
 
   async generate(
     context: GenerationContext,
@@ -83,7 +82,9 @@ export class VocabulariesService
     if (!Array.isArray(data)) {
       return {
         isValid: false,
-        errors: ['Output must be an array of vocabulary items under "vocabularies" key.'],
+        errors: [
+          'Output must be an array of vocabulary items under "vocabularies" key.',
+        ],
       };
     }
 

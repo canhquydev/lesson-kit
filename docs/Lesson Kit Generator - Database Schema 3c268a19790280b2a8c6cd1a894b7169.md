@@ -103,8 +103,8 @@ Entity quản lý một Lesson Kit, liên kết với các thành phần nội d
 | `objective` | String  | Mục tiêu hoạt động |
 | `duration_minutes` | Number | Thời lượng (phút) |
 | `group_type` | String | Hình thức nhóm: `individual` / `pair` / `group` / `whole_class` |
-| `instructions` | String | Hướng dẫn chi tiết cho GV |
-| `english_instructions` | Strin | Câu tiếng Anh GV sử dụng khi tổ chức |
+| `instructions_en` | String | Hướng dẫn chi tiết cho GV (tiếng Anh) |
+| `instructions_vn` | String | Hướng dẫn chi tiết cho GV (tiếng Việt) |
 | `student_task` | String | Nhiệm vụ cụ thể của HS |
 | `expected_outcome` | String | Kết quả dự kiến |
 | `sort_order` | Number | Thứ tự |
@@ -161,7 +161,8 @@ Entity quản lý một Lesson Kit, liên kết với các thành phần nội d
 | `question_type` | String | Loại câu hỏi: `multiple_choice` / `true_false` / `matching` / `short_answer` |
 | `options` | String[] | Các đáp án (nếu MC / TF) |
 | `correct_answer` | String (text) | Đáp án đúng |
-| `explanation` | String (text) | Giải thích đáp án |
+| `explanation_en` | String (text) | Giải thích đáp án tiếng anh |
+| `explanation_vn` | String (text) | Giải thích đáp án tiếng việt |
 | `sort_order` | Number | Thứ tự |
 | `createdAt` | Date | Thời điểm tạo |
 | `updatedAt` | Date | Thời điểm cập nhật |

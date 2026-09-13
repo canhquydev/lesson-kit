@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { VocabulariesService } from './vocabularies.service';
 import { Vocabulary } from './schemas/vocabulary.schema';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { GenerationContext } from '../../common/interfaces';
 
 describe('VocabulariesService', () => {
@@ -16,7 +17,8 @@ describe('VocabulariesService', () => {
     subject: 'VAT_LI',
     grade: '10',
     title: 'Chuyển động thẳng đều',
-    content: 'Nội dung bài học về vận tốc, quãng đường, thời gian trong chuyển động thẳng đều.',
+    content:
+      'Nội dung bài học về vận tốc, quãng đường, thời gian trong chuyển động thẳng đều.',
     duration: 45,
     supportLevel: 'B1',
   };
@@ -58,6 +60,10 @@ describe('VocabulariesService', () => {
           provide: AiService,
           useValue: mockAiService,
         },
+        {
+          provide: AiLogsService,
+          useValue: { logError: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -78,17 +84,27 @@ describe('VocabulariesService', () => {
     it('should fail validation if count is less than 8', () => {
       const result = service.validate(sampleValidVocabularies.slice(0, 5));
       expect(result.isValid).toBe(false);
-      expect(result.errors[0]).toContain('Vocabulary count must be between 8 and 15 words');
+      expect(result.errors[0]).toContain(
+        'Vocabulary count must be between 8 and 15 words',
+      );
     });
 
     it('should fail validation if required fields are missing or empty', () => {
       const invalidList = [
         ...sampleValidVocabularies.slice(0, 8),
-        { word: '', phonetic: '', meaning_vi: '', part_of_speech: '', example_sentence: '' },
+        {
+          word: '',
+          phonetic: '',
+          meaning_vi: '',
+          part_of_speech: '',
+          example_sentence: '',
+        },
       ];
       const result = service.validate(invalidList);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Missing or empty "word"'))).toBe(true);
+      expect(
+        result.errors.some((e) => e.includes('Missing or empty "word"')),
+      ).toBe(true);
     });
 
     it('should fail validation if input is not an array', () => {
@@ -107,7 +123,9 @@ describe('VocabulariesService', () => {
     });
 
     it('should append retry errors if provided', () => {
-      const prompt = service.getPrompt(mockContext, ['Item 1 is missing phonetic']);
+      const prompt = service.getPrompt(mockContext, [
+        'Item 1 is missing phonetic',
+      ]);
       expect(prompt).toContain('Lần sinh trước bị lỗi validation');
       expect(prompt).toContain('Item 1 is missing phonetic');
     });

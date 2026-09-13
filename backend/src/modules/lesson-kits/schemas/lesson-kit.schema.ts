@@ -39,7 +39,12 @@ export class LessonKit {
   @Prop()
   request_id: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'LessonContent', required: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'LessonContent',
+    required: true,
+    index: true,
+  })
   lesson_content_id: Types.ObjectId;
 
   @Prop()

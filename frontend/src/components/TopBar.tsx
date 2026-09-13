@@ -1,11 +1,13 @@
-import { Bell, Plus, Search, Sparkle } from "./icons";
+import { Bell, Plus, Search, Sparkle } from "./icons"
 
 export function TopBar({
   onCreate,
+
   onHome,
 }: {
-  onCreate: () => void;
-  onHome: () => void;
+  onCreate: () => void
+
+  onHome: () => void
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur-md">
@@ -51,5 +53,5 @@ export function TopBar({
         </div>
       </div>
     </header>
-  );
+  )
 }

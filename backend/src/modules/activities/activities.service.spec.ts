@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { ActivitiesService } from './activities.service';
 import { Activity } from './schemas/activity.schema';
 import { AiService } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { GenerationContext } from '../../common/interfaces';
 
 describe('ActivitiesService', () => {
@@ -29,8 +30,10 @@ describe('ActivitiesService', () => {
       objective: 'Hiểu bản chất vectơ của vận tốc so với tốc độ.',
       duration_minutes: 8,
       group_type: 'pair',
-      instructions: '1. Đặt câu hỏi... 2. Suy nghĩ 1p... 3. Thảo luận cặp...',
-      english_instructions: 'Think about this question for one minute, then discuss with your partner...',
+      instructions_en:
+        '1. Ask the class: What is the difference between velocity and speed?\n2. Give students one minute to think individually.\n3. Have students discuss in pairs and share their answers.',
+      instructions_vn:
+        '1. Đặt câu hỏi cho cả lớp về sự khác nhau giữa velocity và speed.\n2. Cho học sinh suy nghĩ 1 phút.\n3. Yêu cầu thảo luận cặp và trình bày kết quả.',
       student_task: 'So sánh velocity và speed, tìm ví dụ thực tế.',
       expected_outcome: 'Nêu được: velocity có hướng, speed không có hướng.',
     },
@@ -41,8 +44,10 @@ describe('ActivitiesService', () => {
       objective: 'Ghi nhớ thuật ngữ chuyển động thẳng đều.',
       duration_minutes: 10,
       group_type: 'group',
-      instructions: '1. Chia nhóm 4 người... 2. Phát phiếu bài tập...',
-      english_instructions: 'Match each physics term with its correct definition.',
+      instructions_en:
+        '1. Divide students into groups of 4 and hand out worksheets.\n2. Ask students to match each physics term with its correct definition.\n3. Have a representative from each group present.',
+      instructions_vn:
+        '1. Chia nhóm 4 người, phát phiếu bài tập.\n2. Yêu cầu học sinh nối thuật ngữ với định nghĩa.\n3. Gọi đại diện nhóm trình bày kết quả.',
       student_task: 'Hoàn thành bảng nối định nghĩa trong 5 phút.',
       expected_outcome: 'Hoàn thành chính xác 100% các cặp thuật ngữ.',
     },
@@ -76,6 +81,10 @@ describe('ActivitiesService', () => {
           provide: AiService,
           useValue: mockAiService,
         },
+        {
+          provide: AiLogsService,
+          useValue: { logError: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -96,7 +105,9 @@ describe('ActivitiesService', () => {
     it('should fail validation if activity count is less than 2', () => {
       const result = service.validate([sampleValidActivities[0]]);
       expect(result.isValid).toBe(false);
-      expect(result.errors[0]).toContain('Activity count must be between 2 and 3');
+      expect(result.errors[0]).toContain(
+        'Activity count must be between 2 and 3',
+      );
     });
 
     it('should fail validation if activity count is more than 3', () => {
@@ -107,7 +118,9 @@ describe('ActivitiesService', () => {
       ];
       const result = service.validate(fourActivities);
       expect(result.isValid).toBe(false);
-      expect(result.errors[0]).toContain('Activity count must be between 2 and 3');
+      expect(result.errors[0]).toContain(
+        'Activity count must be between 2 and 3',
+      );
     });
 
     it('should fail validation for unknown activity_type', () => {
@@ -117,7 +130,11 @@ describe('ActivitiesService', () => {
       ];
       const result = service.validate(invalidActivities);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid or missing activity_type'))).toBe(true);
+      expect(
+        result.errors.some((e) =>
+          e.includes('Invalid or missing activity_type'),
+        ),
+      ).toBe(true);
     });
 
     it('should fail validation for unknown group_type', () => {
@@ -127,7 +144,9 @@ describe('ActivitiesService', () => {
       ];
       const result = service.validate(invalidActivities);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid or missing group_type'))).toBe(true);
+      expect(
+        result.errors.some((e) => e.includes('Invalid or missing group_type')),
+      ).toBe(true);
     });
 
     it('should fail validation if duration_minutes <= 0', () => {
@@ -137,7 +156,43 @@ describe('ActivitiesService', () => {
       ];
       const result = service.validate(invalidActivities);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('positive number'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('positive number'))).toBe(
+        true,
+      );
+    });
+
+    it('should fail validation if instructions_vn has fewer than 2 steps', () => {
+      const invalidActivities = [
+        sampleValidActivities[0],
+        {
+          ...sampleValidActivities[1],
+          instructions_vn: 'Just one instruction without numbered steps.',
+        },
+      ];
+      const result = service.validate(invalidActivities);
+      expect(result.isValid).toBe(false);
+      expect(
+        result.errors.some((e) =>
+          e.includes('at least 2 distinct numbered steps'),
+        ),
+      ).toBe(true);
+    });
+
+    it('should fail validation if instructions_en has fewer than 2 steps', () => {
+      const invalidActivities = [
+        sampleValidActivities[0],
+        {
+          ...sampleValidActivities[1],
+          instructions_en: 'Just one sentence in English.',
+        },
+      ];
+      const result = service.validate(invalidActivities);
+      expect(result.isValid).toBe(false);
+      expect(
+        result.errors.some((e) =>
+          e.includes('at least 2 distinct numbered steps'),
+        ),
+      ).toBe(true);
     });
   });
 

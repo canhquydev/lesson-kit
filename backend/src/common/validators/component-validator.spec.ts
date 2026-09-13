@@ -1,11 +1,12 @@
 import { validateAndRetry, ValidationError } from './component-validator';
-import { ValidationResult } from './interfaces/validation-result.interface';
 
 describe('validateAndRetry', () => {
   it('should return data immediately if valid on first attempt', async () => {
     const mockData = [{ id: 1, name: 'Item 1' }];
     const generatorFn = jest.fn().mockResolvedValue(mockData);
-    const validatorFn = jest.fn().mockReturnValue({ isValid: true, errors: [] });
+    const validatorFn = jest
+      .fn()
+      .mockReturnValue({ isValid: true, errors: [] });
 
     const result = await validateAndRetry(generatorFn, validatorFn, 3);
 
@@ -41,9 +42,10 @@ describe('validateAndRetry', () => {
   it('should throw ValidationError if max attempts reached without valid data', async () => {
     const invalidData: unknown[] = [];
     const generatorFn = jest.fn().mockResolvedValue(invalidData);
-    const validatorFn = jest
-      .fn()
-      .mockReturnValue({ isValid: false, errors: ['List must contain at least 1 item'] });
+    const validatorFn = jest.fn().mockReturnValue({
+      isValid: false,
+      errors: ['List must contain at least 1 item'],
+    });
 
     await expect(validateAndRetry(generatorFn, validatorFn, 3)).rejects.toThrow(
       ValidationError,

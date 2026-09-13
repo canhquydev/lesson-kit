@@ -1,7 +1,6 @@
 import { GenerationContext } from '../../interfaces/generation-context.interface';
 import { ValidationResult } from './validation-result.interface';
 
-
 export interface ComponentDependencies {
   /** Danh sách từ vựng chuyên ngành từ Phase 1 */
   vocabularies?: any[];
@@ -25,9 +24,11 @@ export interface ComponentDependencies {
   [key: string]: any;
 }
 
-
 export interface ComponentGenerator<T, TDependencies = ComponentDependencies> {
-  generate(context: GenerationContext, dependencies?: TDependencies): Promise<T[]>;
+  generate(
+    context: GenerationContext,
+    dependencies?: TDependencies,
+  ): Promise<T[]>;
 
   // Kiểm tra tính hợp lệ về cấu trúc và nghiệp vụ của dữ liệu do AI trả về
   validate(data: any[]): ValidationResult;
@@ -38,10 +39,7 @@ export interface ComponentGenerator<T, TDependencies = ComponentDependencies> {
     dependencies?: TDependencies,
     retryErrors?: string[],
   ): string;
-  getPrompt(
-    context: GenerationContext,
-    retryErrors?: string[],
-  ): string;
+  getPrompt(context: GenerationContext, retryErrors?: string[]): string;
 
   // Lấy danh sách thành phần theo ID của Lesson Kit
   findByKitId(kitId: string): Promise<T[]>;

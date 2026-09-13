@@ -87,16 +87,16 @@ export class Activity {
   group_type: string;
 
   /**
-   * Hướng dẫn chi tiết các bước tổ chức dành cho giáo viên
+   * Hướng dẫn chi tiết các bước tổ chức dành cho giáo viên (tiếng Anh)
    */
   @Prop({ required: true, trim: true })
-  instructions: string;
+  instructions_en: string;
 
   /**
-   * Câu lệnh hoặc lời dẫn bằng tiếng Anh GV sử dụng khi tổ chức hoạt động
+   * Hướng dẫn chi tiết các bước tổ chức dành cho giáo viên (tiếng Việt)
    */
   @Prop({ required: true, trim: true })
-  english_instructions: string;
+  instructions_vn: string;
 
   /**
    * Nhiệm vụ cụ thể của học sinh cần hoàn thành

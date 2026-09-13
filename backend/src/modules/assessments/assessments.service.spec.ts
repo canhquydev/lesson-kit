@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { GenerationContext } from '../../common/interfaces';
 import { ValidationError } from '../../common/validators';
 import { AiService, ChatMessage } from '../ai/ai.service';
+import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { AssessmentQuestionType } from './constants';
 import { AssessmentItemDto } from './dto';
 import { Assessment } from './schemas/assessment.schema';
@@ -38,7 +39,8 @@ describe('AssessmentsService', () => {
       question_type: AssessmentQuestionType.MULTIPLE_CHOICE,
       options: ['Newton', 'Joule', 'Watt', 'Pascal'],
       correct_answer: 'Newton',
-      explanation: 'The SI unit of force is the Newton (N).',
+      explanation_en: 'The SI unit of force is the Newton (N).',
+      explanation_vn: 'Đơn vị SI của lực là Newton (N).',
       sort_order: 1,
     },
     {
@@ -46,7 +48,8 @@ describe('AssessmentsService', () => {
       question_type: AssessmentQuestionType.TRUE_FALSE,
       options: ['True', 'False'],
       correct_answer: 'True',
-      explanation: "This is Newton's second law: F = ma.",
+      explanation_en: "This is Newton's second law: F = ma.",
+      explanation_vn: 'Đây là định luật 2 Newton: F = ma.',
       sort_order: 2,
     },
     {
@@ -54,7 +57,8 @@ describe('AssessmentsService', () => {
       question_type: AssessmentQuestionType.SHORT_ANSWER,
       options: [],
       correct_answer: 'Net force',
-      explanation: 'A non-zero net force causes acceleration.',
+      explanation_en: 'A non-zero net force causes acceleration.',
+      explanation_vn: 'Hợp lực khác không gây ra gia tốc.',
       sort_order: 3,
     },
   ];
@@ -99,6 +103,10 @@ describe('AssessmentsService', () => {
           provide: AiService,
           useValue: { generateJson },
         },
+        {
+          provide: AiLogsService,
+          useValue: { logError: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -132,7 +140,8 @@ describe('AssessmentsService', () => {
           question_type: AssessmentQuestionType.SHORT_ANSWER,
           options: [],
           correct_answer: 'Answer',
-          explanation: 'Exp',
+          explanation_en: 'Exp EN',
+          explanation_vn: 'Exp VN',
           sort_order: 4,
         },
         {
@@ -140,7 +149,8 @@ describe('AssessmentsService', () => {
           question_type: AssessmentQuestionType.SHORT_ANSWER,
           options: [],
           correct_answer: 'Answer',
-          explanation: 'Exp',
+          explanation_en: 'Exp EN',
+          explanation_vn: 'Exp VN',
           sort_order: 5,
         },
         {
@@ -148,7 +158,8 @@ describe('AssessmentsService', () => {
           question_type: AssessmentQuestionType.SHORT_ANSWER,
           options: [],
           correct_answer: 'Answer',
-          explanation: 'Exp',
+          explanation_en: 'Exp EN',
+          explanation_vn: 'Exp VN',
           sort_order: 6,
         },
       ];
