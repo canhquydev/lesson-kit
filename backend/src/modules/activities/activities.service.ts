@@ -61,7 +61,8 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
           },
         ]);
 
-        return response.activities || [];
+        const rawActivities = response.activities || [];
+        return rawActivities.map((act) => this.normalizeActivity(act));
       },
       (data: any[]) => this.validate(data),
       3,
@@ -254,6 +255,7 @@ ${context.content}
 """
 
 --- 10 LOẠI HÌNH HOẠT ĐỘNG ĐỀ XUẤT ---
+(BẮT BUỘC chọn đúng 1 trong 10 loại sau cho trường "activity_type")
 1. Think-Pair-Share
 2. Matching
 3. Role-play
@@ -268,8 +270,10 @@ ${context.content}
 --- YÊU CẦU ĐẦU RA (BẮT BUỘC) ---
 1. Số lượng: Đúng từ 2 đến 3 hoạt động (không ít hơn 2 và không nhiều hơn 3).
 2. Phục vụ mục tiêu: Hoạt động phải phục vụ trực tiếp mục tiêu kiến thức và kỹ năng của bài học, không đơn thuần chơi cho vui.
-3. Thời lượng hợp lý: Tổng thời lượng tiết học là ${context.duration} phút. Hãy tự cân đối thời lượng mỗi hoạt động dựa trên tính chất bài học (bài thực hành → hoạt động nhiều hơn, bài lý thuyết → hoạt động ít hơn). QUAN TRỌNG: Phải chừa đủ thời gian (tối thiểu 8 phút) cho các phần khác trong tiết như mở bài (warm-up), kiểm tra đánh giá (assessment) và tổng kết (wrap-up) — tức tổng thời lượng activities KHÔNG được bằng toàn bộ thời lượng tiết.
-4. Hình thức nhóm (group_type): Chọn một trong các giá trị sau: individual | pair | group | whole_class.
+3. Thời lượng hợp lý: Tổng thời lượng tiết học là ${context.duration} phút. Tự cân đối thời lượng mỗi hoạt động dựa trên tính chất bài học.
+4. Phân biệt activity_type và group_type:
+   - "activity_type": HÌNH THỨC SƯ PHẠM (chỉ chọn 1 trong 10 loại ở trên). TUYỆT ĐỐI KHÔNG điền "Group", "Individual", "Pair" vào activity_type!
+   - "group_type": QUY MÔ TỔ CHỨC (chọn 1 trong 4 giá trị: individual | pair | group | whole_class).
 5. Hướng dẫn chi tiết tiếng Anh (instructions_en): Các bước rõ ràng bằng tiếng Anh cho giáo viên tổ chức từ chuẩn bị đến thực hiện và kết luận. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n) giữa các bước. VD: "1. Prepare cards...\n2. Divide students...\n3. Ask them to...".
 6. Hướng dẫn chi tiết tiếng Việt (instructions_vn): Bản tiếng Việt tương ứng của instructions_en. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n). VD: "1. Chuẩn bị...\n2. Chia nhóm...\n3. Yêu cầu...\n4. Tổng kết...".
 7. Nhiệm vụ học sinh (student_task): Mô tả rõ học sinh phải làm gì, thảo luận gì hoặc giải quyết vấn đề gì.
@@ -330,6 +334,111 @@ ${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
     if (!text) return 0;
     const matches = text.match(/(?:^|\n)\s*\d+\./g);
     return matches ? matches.length : text.trim() ? 1 : 0;
+  }
+
+  /**
+   * Chuẩn hóa activity item từ AI, tự động ánh xạ các giá trị lệch chuẩn (ví dụ nhầm activity_type thành "Group")
+   */
+  private normalizeActivity(item: any): any {
+    if (!item || typeof item !== 'object') return item;
+
+    let activityType = item.activity_type;
+    if (typeof activityType === 'string') {
+      const trimmed = activityType.trim();
+      const lower = trimmed.toLowerCase();
+
+      if (
+        lower === 'think-pair-share' ||
+        lower === 'think_pair_share' ||
+        lower === 'think pair share'
+      ) {
+        activityType = ActivityType.THINK_PAIR_SHARE;
+      } else if (
+        lower === 'matching' ||
+        lower === 'nối' ||
+        lower === 'ghép đôi'
+      ) {
+        activityType = ActivityType.MATCHING;
+      } else if (
+        lower === 'role-play' ||
+        lower === 'role_play' ||
+        lower === 'roleplay' ||
+        lower === 'đóng vai'
+      ) {
+        activityType = ActivityType.ROLE_PLAY;
+      } else if (lower === 'quiz' || lower === 'trắc nghiệm') {
+        activityType = ActivityType.QUIZ;
+      } else if (
+        lower === 'discussion' ||
+        lower === 'thảo luận' ||
+        lower === 'thảo luận nhóm'
+      ) {
+        activityType = ActivityType.DISCUSSION;
+      } else if (
+        lower === 'hỏi đáp' ||
+        lower === 'hoi dap' ||
+        lower === 'q&a' ||
+        lower === 'qa'
+      ) {
+        activityType = ActivityType.HOI_DAP;
+      } else if (
+        lower === 'problem solving' ||
+        lower === 'problem_solving' ||
+        lower === 'problem-solving' ||
+        lower === 'giải quyết vấn đề'
+      ) {
+        activityType = ActivityType.PROBLEM_SOLVING;
+      } else if (lower === 'game' || lower === 'trò chơi') {
+        activityType = ActivityType.GAME;
+      } else if (lower === 'presentation' || lower === 'thuyết trình') {
+        activityType = ActivityType.PRESENTATION;
+      } else if (
+        lower === 'practice task' ||
+        lower === 'practice_task' ||
+        lower === 'practice' ||
+        lower === 'thực hành'
+      ) {
+        activityType = ActivityType.PRACTICE_TASK;
+      } else if (
+        lower === 'group' ||
+        lower === 'group work' ||
+        lower === 'group_work' ||
+        lower === 'nhóm'
+      ) {
+        // AI nhầm activity_type thành group_type -> gán về Practice task chuẩn sư phạm
+        activityType = ActivityType.PRACTICE_TASK;
+      }
+    }
+
+    let groupType = item.group_type;
+    if (typeof groupType === 'string') {
+      const lowerGroup = groupType.trim().toLowerCase();
+      if (lowerGroup === 'individual' || lowerGroup === 'cá nhân') {
+        groupType = GroupType.INDIVIDUAL;
+      } else if (
+        lowerGroup === 'pair' ||
+        lowerGroup === 'cặp' ||
+        lowerGroup === 'đôi'
+      ) {
+        groupType = GroupType.PAIR;
+      } else if (lowerGroup === 'group' || lowerGroup === 'nhóm') {
+        groupType = GroupType.GROUP;
+      } else if (
+        lowerGroup === 'whole_class' ||
+        lowerGroup === 'whole class' ||
+        lowerGroup === 'cả lớp'
+      ) {
+        groupType = GroupType.WHOLE_CLASS;
+      }
+    }
+
+    return {
+      ...item,
+      activity_type: activityType,
+      group_type: groupType,
+      instructions_en: this.normalizeInstructions(item.instructions_en),
+      instructions_vn: this.normalizeInstructions(item.instructions_vn),
+    };
   }
 
   /**
