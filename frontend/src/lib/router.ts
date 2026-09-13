@@ -1,7 +1,8 @@
-export type Route = { view: "dashboard" } | { view: "create" } | {
-  view: "progress"
-  kitId: string
-} | { view: "detail" kitId: string tab?: string }
+export type Route =
+  | { view: "dashboard" }
+  | { view: "create" }
+  | { view: "progress"; kitId: string }
+  | { view: "detail"; kitId: string; tab?: string }
 
 export const TAB_TO_SLUG: Record<string, string> = {
   "Từ vựng": "tu-vung",

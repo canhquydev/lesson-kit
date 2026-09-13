@@ -100,7 +100,7 @@ export function getKitDetail(id: string) {
 }
 
 export async function getKitList(page = 1, limit = 20) {
-  const res = await api.get<{ data: LessonKitListItem[] total: number }>(
+  const res = await api.get<{ data: LessonKitListItem[]; total: number }>(
     `/lesson-kit?page=${page}&limit=${limit}`,
   )
 
@@ -122,7 +122,7 @@ export interface RegenerateAllStaleResult {
 
   regenerated: string[]
 
-  failed: { component: string error: string }[]
+  failed: { component: string; error: string }[]
 
   remaining_stale: string[]
 }

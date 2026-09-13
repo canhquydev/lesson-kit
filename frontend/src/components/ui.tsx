@@ -4,7 +4,7 @@ import { Check, ChevronDown, Search, Trash, AlertCircle } from "./icons"
 
 /* ---------- Combobox / Select ---------- */
 
-export type Option = { value: string label: string hint?: string }
+export type Option = { value: string; label: string; hint?: string }
 
 export function Combobox({
   label,

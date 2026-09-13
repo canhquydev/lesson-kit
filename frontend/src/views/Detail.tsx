@@ -170,7 +170,7 @@ function ActionBtn({
 
   disabled,
 }: {
-  icon: ComponentType<{ width?: number height?: number className?: string }>
+  icon: ComponentType<{ width?: number; height?: number; className?: string }>
 
   label: string
 
