@@ -61,6 +61,13 @@ export class LessonKitsController {
     return BaseResponseDto.ok({ id }, 'Đã xóa Lesson Kit');
   }
 
+  @Post(':id/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async retry(@Param('id', ParseMongoIdPipe) id: string) {
+    const data = await this.lessonKitsService.retry(id);
+    return BaseResponseDto.ok(data, 'Lesson Kit đang được tiếp tục tạo');
+  }
+
   @Post(':id/regenerate-all-stale')
   async regenerateAllStale(@Param('id', ParseMongoIdPipe) id: string) {
     const result = await this.regenerateService.regenerateAllStale(id);

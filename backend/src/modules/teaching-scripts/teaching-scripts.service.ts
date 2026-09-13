@@ -384,7 +384,7 @@ export class TeachingScriptsService implements ComponentGenerator<
     });
     const violations = validateSync(instance, {
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
       forbidUnknownValues: true,
     });
     return violations.flatMap((v) => Object.values(v.constraints ?? {}));

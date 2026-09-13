@@ -126,7 +126,7 @@ describe('ActivitiesService', () => {
     it('should fail validation for unknown activity_type', () => {
       const invalidActivities = [
         sampleValidActivities[0],
-        { ...sampleValidActivities[1], activity_type: 'InvalidType' },
+        { ...sampleValidActivities[1], activity_type: 'TotallyInvalidType' },
       ];
       const result = service.validate(invalidActivities);
       expect(result.isValid).toBe(false);
@@ -135,6 +135,26 @@ describe('ActivitiesService', () => {
           e.includes('Invalid or missing activity_type'),
         ),
       ).toBe(true);
+    });
+
+    it('should auto-normalize activity_type "Group" to Practice task and validate successfully', () => {
+      const activitiesWithGroup = [
+        sampleValidActivities[0],
+        { ...sampleValidActivities[1], activity_type: 'Group' },
+      ];
+      const result = service.validate(activitiesWithGroup);
+      expect(result.isValid).toBe(true);
+      expect(activitiesWithGroup[1].activity_type).toBe('Practice task');
+    });
+
+    it('should auto-normalize group_type case variations (e.g. "WHOLE CLASS")', () => {
+      const activitiesWithVariantGroup = [
+        sampleValidActivities[0],
+        { ...sampleValidActivities[1], group_type: 'WHOLE CLASS' },
+      ];
+      const result = service.validate(activitiesWithVariantGroup);
+      expect(result.isValid).toBe(true);
+      expect(activitiesWithVariantGroup[1].group_type).toBe('whole_class');
     });
 
     it('should fail validation for unknown group_type', () => {

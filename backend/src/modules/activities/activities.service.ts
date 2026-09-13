@@ -61,8 +61,11 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
           },
         ]);
 
-        const rawActivities = response.activities || [];
-        return rawActivities.map((act) => this.normalizeActivity(act));
+        return (response.activities || []).map((item) => ({
+          ...item,
+          activity_type: this.normalizeActivityType(item?.activity_type),
+          group_type: this.normalizeGroupType(item?.group_type),
+        }));
       },
       (data: any[]) => this.validate(data),
       3,
@@ -80,6 +83,8 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
 
     return rawActivities.map((item, index) => ({
       ...item,
+      activity_type: this.normalizeActivityType(item.activity_type),
+      group_type: this.normalizeGroupType(item.group_type),
       instructions_en: this.normalizeInstructions(item.instructions_en),
       instructions_vn: this.normalizeInstructions(item.instructions_vn),
       sort_order: item.sort_order ?? index + 1,
@@ -125,6 +130,15 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
         !item.activity_name.trim()
       ) {
         errors.push(`${prefix}: Missing or empty "activity_name".`);
+      }
+
+      if (item && typeof item === 'object') {
+        if (item.activity_type) {
+          item.activity_type = this.normalizeActivityType(item.activity_type);
+        }
+        if (item.group_type) {
+          item.group_type = this.normalizeGroupType(item.group_type);
+        }
       }
 
       if (!item?.activity_type || !validActivityTypes.has(item.activity_type)) {
@@ -255,7 +269,6 @@ ${context.content}
 """
 
 --- 10 LOẠI HÌNH HOẠT ĐỘNG ĐỀ XUẤT ---
-(BẮT BUỘC chọn đúng 1 trong 10 loại sau cho trường "activity_type")
 1. Think-Pair-Share
 2. Matching
 3. Role-play
@@ -270,14 +283,15 @@ ${context.content}
 --- YÊU CẦU ĐẦU RA (BẮT BUỘC) ---
 1. Số lượng: Đúng từ 2 đến 3 hoạt động (không ít hơn 2 và không nhiều hơn 3).
 2. Phục vụ mục tiêu: Hoạt động phải phục vụ trực tiếp mục tiêu kiến thức và kỹ năng của bài học, không đơn thuần chơi cho vui.
-3. Thời lượng hợp lý: Tổng thời lượng tiết học là ${context.duration} phút. Tự cân đối thời lượng mỗi hoạt động dựa trên tính chất bài học.
-4. Phân biệt activity_type và group_type:
-   - "activity_type": HÌNH THỨC SƯ PHẠM (chỉ chọn 1 trong 10 loại ở trên). TUYỆT ĐỐI KHÔNG điền "Group", "Individual", "Pair" vào activity_type!
-   - "group_type": QUY MÔ TỔ CHỨC (chọn 1 trong 4 giá trị: individual | pair | group | whole_class).
-5. Hướng dẫn chi tiết tiếng Anh (instructions_en): Các bước rõ ràng bằng tiếng Anh cho giáo viên tổ chức từ chuẩn bị đến thực hiện và kết luận. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n) giữa các bước. VD: "1. Prepare cards...\n2. Divide students...\n3. Ask them to...".
-6. Hướng dẫn chi tiết tiếng Việt (instructions_vn): Bản tiếng Việt tương ứng của instructions_en. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n). VD: "1. Chuẩn bị...\n2. Chia nhóm...\n3. Yêu cầu...\n4. Tổng kết...".
-7. Nhiệm vụ học sinh (student_task): Mô tả rõ học sinh phải làm gì, thảo luận gì hoặc giải quyết vấn đề gì.
-8. Kết quả mong đợi (expected_outcome): Nêu rõ sản phẩm hoặc kết quả cụ thể học sinh đạt được.
+3. Thời lượng hợp lý: Tổng thời lượng tiết học là ${context.duration} phút. Hãy tự cân đối thời lượng mỗi hoạt động dựa trên tính chất bài học (bài thực hành → hoạt động nhiều hơn, bài lý thuyết → hoạt động ít hơn). QUAN TRỌNG: Phải chừa đủ thời gian (tối thiểu 8 phút) cho các phần khác trong tiết như mở bài (warm-up), kiểm tra đánh giá (assessment) và tổng kết (wrap-up) — tức tổng thời lượng activities KHÔNG được bằng toàn bộ thời lượng tiết.
+4. Loại hình hoạt động (activity_type): BẮT BUỘC chọn đúng 1 trong 10 loại hình:
+   Think-Pair-Share | Matching | Role-play | Quiz | Discussion | Hỏi đáp | Problem solving | Game | Presentation | Practice task.
+   ⚠️ CẢNH BÁO QUAN TRỌNG: TUYỆT ĐỐI KHÔNG điền "Group", "Individual", "Pair" vào "activity_type" (đây là group_type, KHÔNG PHẢI activity_type). Với các hoạt động thực hành làm bài/làm mô hình theo nhóm, hãy chọn "Practice task" hoặc "Problem solving".
+5. Hình thức nhóm (group_type): Chọn một trong 4 giá trị: individual | pair | group | whole_class.
+6. Hướng dẫn chi tiết tiếng Anh (instructions_en): Các bước rõ ràng bằng tiếng Anh cho giáo viên tổ chức từ chuẩn bị đến thực hiện và kết luận. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n) giữa các bước. VD: "1. Prepare cards...\n2. Divide students...\n3. Ask them to...".
+7. Hướng dẫn chi tiết tiếng Việt (instructions_vn): Bản tiếng Việt tương ứng của instructions_en. BẮT BUỘC viết mỗi bước trên một dòng riêng, dùng ký tự xuống dòng (\n). VD: "1. Chuẩn bị...\n2. Chia nhóm...\n3. Yêu cầu...\n4. Tổng kết...".
+8. Nhiệm vụ học sinh (student_task): Mô tả rõ học sinh phải làm gì, thảo luận gì hoặc giải quyết vấn đề gì.
+9. Kết quả mong đợi (expected_outcome): Nêu rõ sản phẩm hoặc kết quả cụ thể học sinh đạt được.
 
 --- ĐỊNH DẠNG JSON YÊU CẦU ---
 Trả về đối tượng JSON duy nhất có cấu trúc:
@@ -285,7 +299,7 @@ Trả về đối tượng JSON duy nhất có cấu trúc:
   "activities": [
     {
       "activity_name": "tên hoạt động hấp dẫn và bám sát bài học",
-      "activity_type": "Think-Pair-Share | Matching | Role-play | Quiz | Discussion | Hỏi đáp | Problem solving | Game | Presentation | Practice task",
+      "activity_type": "Think-Pair-Share | Matching | Role-play | Quiz | Discussion | Hỏi đáp | Problem solving | Game | Presentation | Practice task (KHÔNG ĐƯỢC ĐIỀN 'Group')",
       "description": "mô tả ngắn gọn về hoạt động",
       "objective": "mục tiêu sư phạm cụ thể",
       "duration_minutes": 8,
@@ -307,6 +321,97 @@ ${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
     }
 
     return prompt;
+  }
+
+  /**
+   * Chuẩn hóa activity_type và tự động map các nhầm lẫn phổ biến của AI
+   * (Đặc biệt: AI hay nhầm group_type "Group" thành activity_type)
+   */
+  private normalizeActivityType(type: any): string {
+    if (!type || typeof type !== 'string') return type;
+    const trimmed = type.trim();
+    const lower = trimmed.toLowerCase().replace(/[\s_-]+/g, ' ');
+
+    if (lower === 'think pair share' || lower === 'think-pair-share') {
+      return ActivityType.THINK_PAIR_SHARE;
+    }
+    if (lower === 'matching') {
+      return ActivityType.MATCHING;
+    }
+    if (lower === 'role play' || lower === 'role-play' || lower === 'roleplay') {
+      return ActivityType.ROLE_PLAY;
+    }
+    if (lower === 'quiz') {
+      return ActivityType.QUIZ;
+    }
+    if (lower === 'discussion' || lower === 'thảo luận') {
+      return ActivityType.DISCUSSION;
+    }
+    if (
+      lower === 'hỏi đáp' ||
+      lower === 'hoi dap' ||
+      lower === 'q&a' ||
+      lower === 'q and a' ||
+      lower === 'qa'
+    ) {
+      return ActivityType.HOI_DAP;
+    }
+    if (
+      lower === 'problem solving' ||
+      lower === 'problem-solving' ||
+      lower === 'giải quyết vấn đề'
+    ) {
+      return ActivityType.PROBLEM_SOLVING;
+    }
+    if (lower === 'game' || lower === 'trò chơi') {
+      return ActivityType.GAME;
+    }
+    if (lower === 'presentation' || lower === 'thuyết trình') {
+      return ActivityType.PRESENTATION;
+    }
+    if (
+      lower === 'practice task' ||
+      lower === 'practice' ||
+      lower === 'thực hành' ||
+      lower === 'luyện tập' ||
+      lower === 'group' ||
+      lower === 'group work' ||
+      lower === 'làm việc nhóm' ||
+      lower === 'individual' ||
+      lower === 'individual work'
+    ) {
+      return ActivityType.PRACTICE_TASK;
+    }
+
+    return trimmed;
+  }
+
+  /**
+   * Chuẩn hóa group_type về enum hợp lệ (individual, pair, group, whole_class)
+   */
+  private normalizeGroupType(type: any): string {
+    if (!type || typeof type !== 'string') return type;
+    const lower = type.trim().toLowerCase().replace(/[\s-]+/g, '_');
+
+    if (lower === 'individual' || lower === 'cá_nhân') {
+      return GroupType.INDIVIDUAL;
+    }
+    if (lower === 'pair' || lower === 'cặp' || lower === 'cặp_đôi') {
+      return GroupType.PAIR;
+    }
+    if (lower === 'group' || lower === 'nhóm') {
+      return GroupType.GROUP;
+    }
+    if (
+      lower === 'whole_class' ||
+      lower === 'wholeclass' ||
+      lower === 'toàn_lớp' ||
+      lower === 'cả_lớp'
+    ) {
+      return GroupType.WHOLE_CLASS;
+    }
+
+    return type.trim();
   }
 
   /**
@@ -334,111 +439,6 @@ ${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
     if (!text) return 0;
     const matches = text.match(/(?:^|\n)\s*\d+\./g);
     return matches ? matches.length : text.trim() ? 1 : 0;
-  }
-
-  /**
-   * Chuẩn hóa activity item từ AI, tự động ánh xạ các giá trị lệch chuẩn (ví dụ nhầm activity_type thành "Group")
-   */
-  private normalizeActivity(item: any): any {
-    if (!item || typeof item !== 'object') return item;
-
-    let activityType = item.activity_type;
-    if (typeof activityType === 'string') {
-      const trimmed = activityType.trim();
-      const lower = trimmed.toLowerCase();
-
-      if (
-        lower === 'think-pair-share' ||
-        lower === 'think_pair_share' ||
-        lower === 'think pair share'
-      ) {
-        activityType = ActivityType.THINK_PAIR_SHARE;
-      } else if (
-        lower === 'matching' ||
-        lower === 'nối' ||
-        lower === 'ghép đôi'
-      ) {
-        activityType = ActivityType.MATCHING;
-      } else if (
-        lower === 'role-play' ||
-        lower === 'role_play' ||
-        lower === 'roleplay' ||
-        lower === 'đóng vai'
-      ) {
-        activityType = ActivityType.ROLE_PLAY;
-      } else if (lower === 'quiz' || lower === 'trắc nghiệm') {
-        activityType = ActivityType.QUIZ;
-      } else if (
-        lower === 'discussion' ||
-        lower === 'thảo luận' ||
-        lower === 'thảo luận nhóm'
-      ) {
-        activityType = ActivityType.DISCUSSION;
-      } else if (
-        lower === 'hỏi đáp' ||
-        lower === 'hoi dap' ||
-        lower === 'q&a' ||
-        lower === 'qa'
-      ) {
-        activityType = ActivityType.HOI_DAP;
-      } else if (
-        lower === 'problem solving' ||
-        lower === 'problem_solving' ||
-        lower === 'problem-solving' ||
-        lower === 'giải quyết vấn đề'
-      ) {
-        activityType = ActivityType.PROBLEM_SOLVING;
-      } else if (lower === 'game' || lower === 'trò chơi') {
-        activityType = ActivityType.GAME;
-      } else if (lower === 'presentation' || lower === 'thuyết trình') {
-        activityType = ActivityType.PRESENTATION;
-      } else if (
-        lower === 'practice task' ||
-        lower === 'practice_task' ||
-        lower === 'practice' ||
-        lower === 'thực hành'
-      ) {
-        activityType = ActivityType.PRACTICE_TASK;
-      } else if (
-        lower === 'group' ||
-        lower === 'group work' ||
-        lower === 'group_work' ||
-        lower === 'nhóm'
-      ) {
-        // AI nhầm activity_type thành group_type -> gán về Practice task chuẩn sư phạm
-        activityType = ActivityType.PRACTICE_TASK;
-      }
-    }
-
-    let groupType = item.group_type;
-    if (typeof groupType === 'string') {
-      const lowerGroup = groupType.trim().toLowerCase();
-      if (lowerGroup === 'individual' || lowerGroup === 'cá nhân') {
-        groupType = GroupType.INDIVIDUAL;
-      } else if (
-        lowerGroup === 'pair' ||
-        lowerGroup === 'cặp' ||
-        lowerGroup === 'đôi'
-      ) {
-        groupType = GroupType.PAIR;
-      } else if (lowerGroup === 'group' || lowerGroup === 'nhóm') {
-        groupType = GroupType.GROUP;
-      } else if (
-        lowerGroup === 'whole_class' ||
-        lowerGroup === 'whole class' ||
-        lowerGroup === 'cả lớp'
-      ) {
-        groupType = GroupType.WHOLE_CLASS;
-      }
-    }
-
-    return {
-      ...item,
-      activity_type: activityType,
-      group_type: groupType,
-      instructions_en: this.normalizeInstructions(item.instructions_en),
-      instructions_vn: this.normalizeInstructions(item.instructions_vn),
-    };
   }
 
   /**

@@ -52,9 +52,11 @@ export default function App() {
         {route.view === "dashboard" && (
           <Dashboard
             onOpenKit={(id, status) => {
-              if (status?.toLowerCase() === "generating") {
+              if (
+                status?.toLowerCase() === "generating" ||
+                status?.toLowerCase() === "failed"
+              ) {
                 navigateTo(`/progress/${id}`)
-
                 return
               }
 

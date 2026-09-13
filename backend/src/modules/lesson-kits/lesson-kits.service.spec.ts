@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { LessonKitsService } from './lesson-kits.service';
 import { LessonKit } from './schemas/lesson-kit.schema';
@@ -304,4 +304,56 @@ describe('LessonKitsService', () => {
       );
     });
   });
+
+  describe('retry', () => {
+    it('should throw NotFoundException if kit does not exist', async () => {
+      mockLessonKitModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
+      await expect(service.retry('6aa6ba0de07b9eacdba50a66')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException if kit is already generating', async () => {
+      const mockKit = {
+        _id: new Types.ObjectId(),
+        status: LessonKitStatus.GENERATING,
+        save: jest.fn(),
+      };
+      mockLessonKitModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockKit),
+      });
+
+      await expect(service.retry(mockKit._id.toHexString())).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should set status to GENERATING and emit lesson-kit.generate event', async () => {
+      const mockKit = {
+        _id: new Types.ObjectId(),
+        status: LessonKitStatus.FAILED,
+        current_step: 'phase1_activities',
+        save: jest.fn().mockResolvedValue(true),
+      };
+      mockLessonKitModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockKit),
+      });
+
+      const result = await service.retry(mockKit._id.toHexString());
+
+      expect(mockKit.status).toBe(LessonKitStatus.GENERATING);
+      expect(mockKit.save).toHaveBeenCalled();
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('lesson-kit.generate', {
+        lessonKitId: mockKit._id.toHexString(),
+      });
+      expect(result).toEqual({
+        lesson_kit_id: mockKit._id.toHexString(),
+        status: LessonKitStatus.GENERATING,
+      });
+    });
+  });
 });
+

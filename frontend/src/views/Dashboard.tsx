@@ -78,9 +78,13 @@ function formatDateTime(iso: string) {
 function RowMenu({
   onView,
   onDelete,
+  onRetry,
+  status,
 }: {
   onView: () => void
   onDelete: () => void
+  onRetry?: () => void
+  status?: string
 }) {
   const [open, setOpen] = useState(false)
 
@@ -167,7 +171,9 @@ function RowMenu({
 
   const items = [
     { label: "Xem", icon: Eye, action: onView },
-
+    ...(status?.toLowerCase() === "failed" && onRetry
+      ? [{ label: "Thử lại", icon: Refresh, action: onRetry }]
+      : []),
     { label: "Xóa", icon: Trash, action: onDelete, danger: true },
   ]
 
@@ -490,7 +496,9 @@ export function Dashboard({
                         onClick={(e) => e.stopPropagation()}
                       >
                         <RowMenu
+                          status={k.status}
                           onView={() => onOpenKit(k._id, k.status)}
+                          onRetry={() => onOpenKit(k._id, k.status)}
                           onDelete={() => handleDelete(k._id)}
                         />
                       </td>

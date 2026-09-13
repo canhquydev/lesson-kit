@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react"
-import { Card } from "../components/ui"
-import { ArrowLeft, ArrowRight, Check } from "../components/icons"
-import { getKitStatus } from "../lib/api"
+import { useEffect, useState, useRef, useCallback } from "react"
+import { Card, toast } from "../components/ui"
+import { ArrowLeft, ArrowRight, Check, Refresh } from "../components/icons"
+import { getKitStatus, retryLessonKit } from "../lib/api"
 import { navigateTo } from "../lib/router"
 import type { FormData } from "../App"
 
@@ -82,55 +82,72 @@ export function Progress({
     duration?: number
     support_level?: string
   } | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const poll = useCallback(async () => {
+    try {
+      const data = await getKitStatus(kitId)
+      setCurrentStep(data.current_step)
+      setStatus(data.status)
+      if (data.generation_time_ms) setGenTime(data.generation_time_ms)
+      if (data.lesson_topic) {
+        setKitMeta({
+          subject: data.subject,
+          grade: data.grade,
+          lesson_topic: data.lesson_topic,
+          duration: data.duration,
+          support_level: data.support_level,
+        })
+      }
+
+      const backendPhase = stepToPhase(data.current_step)
+      const minPhaseFloor =
+        backendPhase === 1
+          ? 3
+          : backendPhase === 2
+            ? 38
+            : backendPhase === 3
+              ? 72
+              : 3
+
+      // Ensure progress never jumps backwards
+      setDisplayProgress((prev) =>
+        Math.max(prev, minPhaseFloor, data.progress_percent || 0),
+      )
+
+      if (data.status === "completed" || data.status === "failed") {
+        if (timerRef.current) clearInterval(timerRef.current)
+      }
+    } catch {
+      // Network error — keep polling
+    }
+  }, [kitId])
 
   // Poll backend status
   useEffect(() => {
-    async function poll() {
-      try {
-        const data = await getKitStatus(kitId)
-        setCurrentStep(data.current_step)
-        setStatus(data.status)
-        if (data.generation_time_ms) setGenTime(data.generation_time_ms)
-        if (data.lesson_topic) {
-          setKitMeta({
-            subject: data.subject,
-            grade: data.grade,
-            lesson_topic: data.lesson_topic,
-            duration: data.duration,
-            support_level: data.support_level,
-          })
-        }
-
-        const backendPhase = stepToPhase(data.current_step)
-        const minPhaseFloor =
-          backendPhase === 1
-            ? 3
-            : backendPhase === 2
-              ? 38
-              : backendPhase === 3
-                ? 72
-                : 3
-
-        // Ensure progress never jumps backwards
-        setDisplayProgress((prev) =>
-          Math.max(prev, minPhaseFloor, data.progress_percent || 0),
-        )
-
-        if (data.status === "completed" || data.status === "failed") {
-          if (timerRef.current) clearInterval(timerRef.current)
-        }
-      } catch {
-        // Network error — keep polling
-      }
-    }
-
     poll()
     timerRef.current = setInterval(poll, 1800)
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [kitId])
+  }, [poll])
+
+  const handleRetry = async () => {
+    try {
+      setRetrying(true)
+      await retryLessonKit(kitId)
+      setStatus("generating")
+      toast("Đang thử lại từ bước bị gián đoạn...", "info")
+      if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = setInterval(poll, 1800)
+      poll()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Thử lại thất bại", "error")
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   const complete = status === "completed"
   const failed = status === "failed"
@@ -340,7 +357,7 @@ export function Progress({
 
         <p className="mt-5 text-center text-[13px] text-slate-500">
           {failed
-            ? "Đã xảy ra lỗi trong quá trình tạo. Vui lòng thử lại."
+            ? "Tiến trình bị gián đoạn ở bước này. Bạn có thể nhấn 'Thử lại' để hệ thống làm tiếp mà không mất dữ liệu đã hoàn thành."
             : complete
               ? "Bộ tài liệu đã sẵn sàng! Đang chuyển hướng..."
               : "Đang tạo bài giảng. Bạn có thể rời khỏi trang — tiến trình sẽ lưu tự động."}
@@ -354,12 +371,34 @@ export function Progress({
             Mở bộ tài liệu bài giảng <ArrowRight width={15} height={15} />
           </button>
         ) : failed ? (
-          <button
-            onClick={() => window.location.reload()}
-            className="mx-auto mt-4 flex items-center gap-1.5 rounded-[11px] bg-rose-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition-colors hover:bg-rose-500"
-          >
-            Thử lại
-          </button>
+          <div className="mx-auto mt-4 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={retrying}
+              onClick={handleRetry}
+              className="flex items-center gap-2 rounded-[11px] bg-indigo-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm shadow-indigo-600/25 transition-colors hover:bg-indigo-500 disabled:opacity-60"
+            >
+              {retrying ? (
+                <>
+                  <span className="lk-spin h-4 w-4 rounded-full border-2 border-white/40 border-t-white" />
+                  <span>Đang thử lại...</span>
+                </>
+              ) : (
+                <>
+                  <Refresh width={15} height={15} />
+                  <span>Thử lại</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo("/")}
+              className="flex items-center gap-1.5 rounded-[10px] border border-slate-200 bg-white px-3.5 py-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 shadow-2xs"
+            >
+              <ArrowLeft width={15} height={15} />
+              <span>Quay về trang chủ</span>
+            </button>
+          </div>
         ) : (
           <button
             onClick={() => navigateTo("/")}

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -232,5 +237,35 @@ export class LessonKitsService {
       await this.lessonKitModel.findByIdAndDelete(id).exec();
       this.logger.log(`Deleted kit ${id} and all components`);
     }
+  }
+
+  /**
+   * Tiếp tục/thử lại quá trình tạo cho Lesson Kit bị thất bại
+   */
+  async retry(id: string): Promise<{ lesson_kit_id: string; status: string }> {
+    const kit = await this.lessonKitModel.findById(id).exec();
+    if (!kit) {
+      throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+    }
+
+    if (kit.status === LessonKitStatus.GENERATING) {
+      throw new BadRequestException('Lesson Kit đang trong quá trình tạo');
+    }
+
+    kit.status = LessonKitStatus.GENERATING;
+    await kit.save();
+
+    this.logger.log(
+      `Retrying generation for kit: ${id} from step: ${kit.current_step}`,
+    );
+
+    this.eventEmitter.emit('lesson-kit.generate', {
+      lessonKitId: kit._id.toHexString(),
+    });
+
+    return {
+      lesson_kit_id: kit._id.toHexString(),
+      status: kit.status,
+    };
   }
 }

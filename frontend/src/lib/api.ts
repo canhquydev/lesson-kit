@@ -111,6 +111,10 @@ export function deleteKit(id: string) {
   return api.del<{ id: string }>(`/lesson-kit/${id}`)
 }
 
+export function retryLessonKit(id: string) {
+  return api.post<GenerateResponse>(`/lesson-kit/${id}/retry`)
+}
+
 export function regenerateComponent(kitId: string, component: string) {
   return api.post<unknown>(`/lesson-kit/${kitId}/regenerate/${component}`)
 }
