@@ -48,35 +48,35 @@ class AssessmentCorrectAnswerConstraint implements ValidatorConstraintInterface 
 export class AssessmentItemDto {
   @IsString()
   @IsNotEmpty()
-  question_text: string;
+  question_text!: string;
 
   @IsEnum(AssessmentQuestionType)
-  question_type: AssessmentQuestionType;
+  question_type!: AssessmentQuestionType;
 
   @IsArray()
   @IsString({ each: true })
   @Validate(AssessmentOptionsConstraint)
-  options: string[];
+  options!: string[];
 
   @IsString()
   @IsNotEmpty()
   @Validate(AssessmentCorrectAnswerConstraint)
-  correct_answer: string;
+  correct_answer!: string;
 
   @IsString()
   @IsNotEmpty()
-  explanation_en: string;
+  explanation_en!: string;
 
   @IsString()
   @IsNotEmpty()
-  explanation_vn: string;
+  explanation_vn!: string;
 
   @IsInt()
   @Min(1)
-  sort_order: number;
+  sort_order!: number;
 }
 
 export class CreateAssessmentDto extends AssessmentItemDto {
   @IsMongoId()
-  lesson_kit_id: string;
+  lesson_kit_id!: string;
 }
