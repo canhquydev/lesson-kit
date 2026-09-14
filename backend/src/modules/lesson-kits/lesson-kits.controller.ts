@@ -10,7 +10,13 @@ import {
   HttpStatus,
   Inject,
   forwardRef,
+  Sse,
+  MessageEvent,
+  Header,
 } from '@nestjs/common';
+import { Observable, fromEvent, interval, merge, defer } from 'rxjs';
+import { map, filter } from 'rxjs/operators';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LessonKitsService } from './lesson-kits.service';
 import { CreateLessonKitDto } from './dto';
 import { BaseResponseDto } from '../../common/dto';
@@ -23,6 +29,7 @@ export class LessonKitsController {
     private readonly lessonKitsService: LessonKitsService,
     @Inject(forwardRef(() => RegenerateService))
     private readonly regenerateService: RegenerateService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Post('generate')
@@ -53,6 +60,32 @@ export class LessonKitsController {
   async getStatus(@Param('id', ParseMongoIdPipe) id: string) {
     const data = await this.lessonKitsService.getStatus(id);
     return BaseResponseDto.ok(data, 'Trạng thái Lesson Kit');
+  }
+
+  @Sse(':id/progress-stream')
+  @Header('Cache-Control', 'no-cache')
+  @Header('X-Accel-Buffering', 'no')
+  progressStream(
+    @Param('id', ParseMongoIdPipe) id: string,
+  ): Observable<MessageEvent> {
+    const initial$ = defer(async () => {
+      try {
+        const current = await this.lessonKitsService.getStatus(id);
+        return { data: current } as MessageEvent;
+      } catch {
+        return null;
+      }
+    }).pipe(filter((msg): msg is MessageEvent => msg !== null));
+
+    const event$ = fromEvent(this.eventEmitter, `kit.${id}.progress`).pipe(
+      map((payload) => ({ data: payload } as MessageEvent)),
+    );
+
+    const heartbeat$ = interval(15000).pipe(
+      map(() => ({ data: { type: 'heartbeat' } } as MessageEvent)),
+    );
+
+    return merge(initial$, event$, heartbeat$);
   }
 
   @Delete(':id')

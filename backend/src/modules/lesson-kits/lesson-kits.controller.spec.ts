@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LessonKitsController } from './lesson-kits.controller';
 import { LessonKitsService } from './lesson-kits.service';
 import {
@@ -25,6 +26,13 @@ describe('LessonKitsController', () => {
     regenerate: jest.fn(),
   };
 
+  const mockEventEmitter = {
+    emit: jest.fn(),
+    on: jest.fn(),
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [LessonKitsController],
@@ -36,6 +44,10 @@ describe('LessonKitsController', () => {
         {
           provide: RegenerateService,
           useValue: mockRegenerateService,
+        },
+        {
+          provide: EventEmitter2,
+          useValue: mockEventEmitter,
         },
       ],
     }).compile();
@@ -152,6 +164,27 @@ describe('LessonKitsController', () => {
       );
       expect(response.success).toBe(true);
       expect(response.data).toEqual(mockResult);
+    });
+  });
+
+  describe('progressStream', () => {
+    it('should return an observable stream for kit progress', (done) => {
+      const mockStatus = {
+        status: LessonKitStatus.GENERATING,
+        current_step: 'phase1',
+      };
+      mockLessonKitsService.getStatus.mockResolvedValue(mockStatus);
+
+      const stream$ = controller.progressStream('kit_123');
+      expect(stream$).toBeDefined();
+
+      const subscription = stream$.subscribe({
+        next: (event) => {
+          expect(event.data).toBeDefined();
+          subscription.unsubscribe();
+          done();
+        },
+      });
     });
   });
 });

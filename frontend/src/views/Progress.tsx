@@ -1,9 +1,14 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { Card, toast } from "../components/ui"
 import { ArrowLeft, ArrowRight, Check, Refresh } from "../components/icons"
-import { getKitStatus, retryLessonKit } from "../lib/api"
+import {
+  getKitStatus,
+  getKitProgressStreamUrl,
+  retryLessonKit,
+} from "../lib/api"
 import { navigateTo } from "../lib/router"
 import type { FormData } from "../App"
+import type { GenerationStatus } from "../lib/types"
 
 const SUBJECT_VN: Record<string, string> = {
   VAT_LI: "Vật lí",
@@ -41,7 +46,7 @@ const PHASE_MESSAGES: Record<number, string[]> = {
   ],
 }
 
-function stepToPhase(step: string): number {
+function stepToPhase(step?: string): number {
   if (!step || step === "pending" || step === "init") return 1
   if (step.startsWith("phase1")) return 1
   if (step.startsWith("phase2")) return 2
@@ -83,55 +88,119 @@ export function Progress({
     support_level?: string
   } | null>(null)
   const [retrying, setRetrying] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const poll = useCallback(async () => {
+  const handleStatusUpdate = useCallback((data: Partial<GenerationStatus>) => {
+    if (data.current_step) setCurrentStep(data.current_step)
+    if (data.status) setStatus(data.status)
+    if (data.generation_time_ms) setGenTime(data.generation_time_ms)
+    if (data.lesson_topic) {
+      setKitMeta({
+        subject: data.subject,
+        grade: data.grade,
+        lesson_topic: data.lesson_topic,
+        duration: data.duration,
+        support_level: data.support_level,
+      })
+    }
+
+    const backendPhase = stepToPhase(data.current_step)
+    const minPhaseFloor =
+      backendPhase === 1
+        ? 3
+        : backendPhase === 2
+          ? 38
+          : backendPhase === 3
+            ? 72
+            : 3
+
+    // Ensure progress never jumps backwards
+    setDisplayProgress((prev) =>
+      Math.max(prev, minPhaseFloor, data.progress_percent || 0),
+    )
+  }, [])
+
+  const stopAllListeners = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current)
+      fallbackTimerRef.current = null
+    }
+  }, [])
+
+  const startFallbackPolling = useCallback(() => {
+    if (fallbackTimerRef.current) return
+    const pollFallback = async () => {
+      try {
+        const data = await getKitStatus(kitId)
+        handleStatusUpdate(data)
+        if (data.status !== "completed" && data.status !== "failed") {
+          fallbackTimerRef.current = setTimeout(pollFallback, 3500)
+        }
+      } catch {
+        fallbackTimerRef.current = setTimeout(pollFallback, 5000)
+      }
+    }
+    fallbackTimerRef.current = setTimeout(pollFallback, 2500)
+  }, [kitId, handleStatusUpdate])
+
+  const connectStream = useCallback(() => {
+    stopAllListeners()
+
+    // 1. Fetch current status once on connect (immediate state restoration on F5)
+    getKitStatus(kitId)
+      .then((data) => {
+        handleStatusUpdate(data)
+        if (data.status === "completed" || data.status === "failed") {
+          return
+        }
+      })
+      .catch(() => {})
+
+    // 2. Open EventSource stream for real-time progress updates
     try {
-      const data = await getKitStatus(kitId)
-      setCurrentStep(data.current_step)
-      setStatus(data.status)
-      if (data.generation_time_ms) setGenTime(data.generation_time_ms)
-      if (data.lesson_topic) {
-        setKitMeta({
-          subject: data.subject,
-          grade: data.grade,
-          lesson_topic: data.lesson_topic,
-          duration: data.duration,
-          support_level: data.support_level,
-        })
+      const sseUrl = getKitProgressStreamUrl(kitId)
+      const eventSource = new EventSource(sseUrl)
+      eventSourceRef.current = eventSource
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === "heartbeat") return // Ignore keep-alive ping
+
+          handleStatusUpdate(data)
+
+          if (data.status === "completed" || data.status === "failed") {
+            stopAllListeners()
+          }
+        } catch {
+          // Ignore JSON parse errors
+        }
       }
 
-      const backendPhase = stepToPhase(data.current_step)
-      const minPhaseFloor =
-        backendPhase === 1
-          ? 3
-          : backendPhase === 2
-            ? 38
-            : backendPhase === 3
-              ? 72
-              : 3
-
-      // Ensure progress never jumps backwards
-      setDisplayProgress((prev) =>
-        Math.max(prev, minPhaseFloor, data.progress_percent || 0),
-      )
-
-      if (data.status === "completed" || data.status === "failed") {
-        if (timerRef.current) clearInterval(timerRef.current)
+      eventSource.onerror = () => {
+        // If SSE connection closes unexpectedly, fallback gracefully to adaptive polling
+        if (eventSource.readyState === EventSource.CLOSED) {
+          stopAllListeners()
+          startFallbackPolling()
+        }
       }
     } catch {
-      // Network error — keep polling
+      startFallbackPolling()
     }
-  }, [kitId])
+  }, [kitId, handleStatusUpdate, startFallbackPolling, stopAllListeners])
 
-  // Poll backend status
+  // Initialize stream on mount
   useEffect(() => {
-    poll()
-    timerRef.current = setInterval(poll, 1800)
+    connectStream()
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      stopAllListeners()
     }
-  }, [poll])
+  }, [connectStream, stopAllListeners])
 
   const handleRetry = async () => {
     try {
@@ -139,9 +208,7 @@ export function Progress({
       await retryLessonKit(kitId)
       setStatus("generating")
       toast("Đang thử lại từ bước bị gián đoạn...", "info")
-      if (timerRef.current) clearInterval(timerRef.current)
-      timerRef.current = setInterval(poll, 1800)
-      poll()
+      connectStream()
     } catch (err) {
       toast(err instanceof Error ? err.message : "Thử lại thất bại", "error")
     } finally {

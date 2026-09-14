@@ -130,6 +130,14 @@ export class LessonKitsService {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
     }
     this.logger.log(`Kit ${id} status → ${status}`);
+
+    const currentStep = result.current_step;
+    this.eventEmitter.emit(`kit.${id}.progress`, {
+      status,
+      current_step: currentStep,
+      progress_percent: this.calculateProgressPercent(status, currentStep),
+      generation_time_ms: generationTimeMs ?? result.generation_time_ms,
+    });
   }
 
   async updateCurrentStep(id: string, step: string): Promise<void> {
@@ -140,6 +148,14 @@ export class LessonKitsService {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
     }
     this.logger.log(`Kit ${id} step → ${step}`);
+
+    const status = result.status ?? LessonKitStatus.GENERATING;
+    this.eventEmitter.emit(`kit.${id}.progress`, {
+      status,
+      current_step: step,
+      progress_percent: this.calculateProgressPercent(status, step),
+      generation_time_ms: result.generation_time_ms,
+    });
   }
 
   private calculateProgressPercent(

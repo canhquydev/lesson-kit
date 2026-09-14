@@ -95,6 +95,10 @@ export function getKitStatus(id: string) {
   return api.get<GenerationStatus>(`/lesson-kit/${id}/status`)
 }
 
+export function getKitProgressStreamUrl(id: string) {
+  return `${BASE}/lesson-kit/${id}/progress-stream`
+}
+
 export function getKitDetail(id: string) {
   return api.get<LessonKitDetail>(`/lesson-kit/${id}`)
 }

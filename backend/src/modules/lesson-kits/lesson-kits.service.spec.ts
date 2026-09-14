@@ -169,9 +169,12 @@ describe('LessonKitsService', () => {
   });
 
   describe('updateStatus', () => {
-    it('should update status and generation time', async () => {
+    it('should update status, generation time, and emit progress event', async () => {
       mockLessonKitModel.findByIdAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({}),
+        exec: jest.fn().mockResolvedValue({
+          current_step: 'phase1',
+          generation_time_ms: 15000,
+        }),
       });
 
       await service.updateStatus('kit_123', LessonKitStatus.COMPLETED, 15000);
@@ -183,13 +186,25 @@ describe('LessonKitsService', () => {
           generation_time_ms: 15000,
         },
       );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'kit.kit_123.progress',
+        expect.objectContaining({
+          status: LessonKitStatus.COMPLETED,
+          current_step: 'phase1',
+          progress_percent: 100,
+          generation_time_ms: 15000,
+        }),
+      );
     });
   });
 
   describe('updateCurrentStep', () => {
-    it('should update current step', async () => {
+    it('should update current step and emit progress event', async () => {
       mockLessonKitModel.findByIdAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({}),
+        exec: jest.fn().mockResolvedValue({
+          status: LessonKitStatus.GENERATING,
+          generation_time_ms: 5000,
+        }),
       });
 
       await service.updateCurrentStep('kit_123', 'phase2');
@@ -197,6 +212,14 @@ describe('LessonKitsService', () => {
       expect(mockLessonKitModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'kit_123',
         { current_step: 'phase2' },
+      );
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'kit.kit_123.progress',
+        expect.objectContaining({
+          status: LessonKitStatus.GENERATING,
+          current_step: 'phase2',
+          progress_percent: 40,
+        }),
       );
     });
   });
