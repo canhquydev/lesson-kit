@@ -252,11 +252,11 @@ function ExpressionsTab({ data }: { data: Expression[] }) {
         >
           {/* Category Header */}
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 font-mono text-[12px] font-bold text-indigo-600 ring-1 ring-inset ring-indigo-200/60">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 font-mono text-[12px] font-bold text-white shadow-xs">
                 {groupIdx + 1}
               </span>
-              <h4 className="text-[14.5px] font-bold text-slate-800">
+              <h4 className="text-[15px] font-bold text-slate-900">
                 {group.label}
               </h4>
             </div>
@@ -656,10 +656,14 @@ function QATab({ data }: { data: StudentQuestion[] }) {
             {/* Question Header (Clickable to collapse/expand answer) */}
             <div
               onClick={() => toggleCard(id)}
-              className="flex cursor-pointer items-start justify-between gap-3 bg-white p-4.5 transition-colors hover:bg-slate-50/60"
+              className={`flex cursor-pointer items-start justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-slate-100/60 ${
+                !isCollapsed
+                  ? "border-b border-slate-100 bg-slate-50/80"
+                  : "bg-slate-50/80"
+              }`}
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-mono text-[11px] font-bold text-white shadow-xs">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 font-mono text-[12px] font-bold text-white shadow-xs">
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -688,7 +692,7 @@ function QATab({ data }: { data: StudentQuestion[] }) {
 
             {/* Answer Section */}
             {!isCollapsed && (
-              <div className="space-y-3.5 border-t border-slate-100 bg-slate-50/40 p-4.5">
+              <div className="space-y-3.5 bg-slate-50/40 p-4.5">
                 {/* English Answer Box */}
                 <div className="rounded-[12px] border border-indigo-100/80 bg-white p-4 shadow-xs">
                   <div className="mb-2 flex items-center justify-between gap-2">
@@ -1073,9 +1077,9 @@ function AssessmentsTab({ data }: { data: Assessment[] }) {
         return (
           <div
             key={a._id || i}
-            className="rounded-[13px] border border-slate-200 p-4 bg-white shadow-2xs"
+            className="overflow-hidden rounded-[14px] border border-slate-200 bg-white p-5 shadow-xs"
           >
-            <div className="mb-2.5 flex items-center justify-between gap-2">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[11.5px] font-semibold text-violet-700">
                 {a.question_type === "multiple_choice"
                   ? "Trắc nghiệm"
@@ -1115,10 +1119,14 @@ function AssessmentsTab({ data }: { data: Assessment[] }) {
 
             {matchingData ? (
               <div>
-                <p className="text-[14px] font-medium text-slate-900">
-                  <span className="mr-1.5 text-slate-400">{i + 1}.</span>
-                  <MathText text={matchingData.prompt} />
-                </p>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 font-mono text-[12px] font-bold text-white shadow-xs">
+                    {i + 1}
+                  </span>
+                  <p className="min-w-0 flex-1 text-[15px] font-bold leading-normal text-slate-900">
+                    <MathText text={matchingData.prompt} />
+                  </p>
+                </div>
                 <div className="my-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {/* Column A */}
                   <div className="rounded-[12px] border border-slate-200 bg-slate-50/70 p-3.5">
@@ -1158,10 +1166,14 @@ function AssessmentsTab({ data }: { data: Assessment[] }) {
                 </div>
               </div>
             ) : (
-              <p className="text-[14px] font-medium text-slate-900">
-                <span className="mr-1.5 text-slate-400">{i + 1}.</span>
-                <MathText text={a.question_text} />
-              </p>
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 font-mono text-[12px] font-bold text-white shadow-xs">
+                  {i + 1}
+                </span>
+                <p className="min-w-0 flex-1 text-[15px] font-bold leading-normal text-slate-900">
+                  <MathText text={a.question_text} />
+                </p>
+              </div>
             )}
 
             {a.options && a.options.length > 0 && (
@@ -1345,8 +1357,8 @@ function ScriptTab({ data }: { data: TeachingScript[] }) {
           >
             {/* Step Header */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 font-mono text-[11.5px] font-semibold text-white">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 font-mono text-[12px] font-bold text-white shadow-xs">
                   {stepNum}
                 </span>
                 <span className="text-[14.5px] font-bold text-slate-800">
