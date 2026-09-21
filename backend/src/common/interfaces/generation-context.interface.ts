@@ -1,9 +1,12 @@
+import { SupportLevel } from '../enums';
+
 export interface GenerationContext {
-  lessonContentId: string;
-  subject: string;
-  grade: string;
-  title: string;
-  content: string;
-  duration: number;
-  supportLevel: string;
+  readonly lessonContentId: string;
+  readonly subject: string;
+  readonly grade: string;
+  readonly title: string;
+  readonly content: string;
+  readonly duration: number;
+  readonly supportLevel: SupportLevel;
 }
+

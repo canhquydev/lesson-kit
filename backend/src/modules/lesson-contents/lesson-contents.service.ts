@@ -25,6 +25,9 @@ export class LessonContentsService {
   }
 
   async findById(id: string): Promise<LessonContentDocument> {
+    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      throw new NotFoundException(`Lesson content with ID "${id}" not found`);
+    }
     const lesson = await this.lessonContentModel.findById(id).exec();
     if (!lesson) {
       throw new NotFoundException(`Lesson content with ID "${id}" not found`);

@@ -43,7 +43,7 @@ describe('HttpExceptionFilter', () => {
     );
   });
 
-  it('should format unexpected Error as 500 Internal server error', () => {
+  it('should format unexpected Error as 500 Internal server error without leaking details', () => {
     const exception = new Error('Database connection failed');
 
     filter.catch(exception, mockArgumentsHost);
@@ -52,7 +52,38 @@ describe('HttpExceptionFilter', () => {
       HttpStatus.INTERNAL_SERVER_ERROR,
     );
     expect(mockResponse.json).toHaveBeenCalledWith(
-      BaseResponseDto.fail('Database connection failed'),
+      BaseResponseDto.fail('Internal server error'),
+    );
+  });
+
+  it('should handle HttpException with null response safely without crashing', () => {
+    const exception = new HttpException(null as any, HttpStatus.BAD_REQUEST);
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      BaseResponseDto.fail('Internal server error'),
+    );
+  });
+
+  it('should format array validation errors into joined string', () => {
+    const exception = new HttpException(
+      {
+        message: ['field1 is required', 'field2 must be a string'],
+        error: 'Bad Request',
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      BaseResponseDto.fail(
+        'field1 is required; field2 must be a string',
+        'Bad Request',
+      ),
     );
   });
 });

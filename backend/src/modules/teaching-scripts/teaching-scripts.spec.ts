@@ -1,6 +1,7 @@
 import { validate } from 'class-validator';
 import { Types } from 'mongoose';
 import { GenerationContext } from '../../common/interfaces';
+import { SupportLevel } from '../../common/enums';
 import { CreateTeachingScriptDto } from './dto/create-teaching-script.dto';
 import {
   buildTeachingScriptPrompt,
@@ -16,7 +17,7 @@ describe('TeachingScripts Day 1 artifacts', () => {
     title: "Newton's laws",
     content: 'Force changes the motion of an object.',
     duration: 45,
-    supportLevel: 'B1',
+    supportLevel: SupportLevel.B1,
   };
 
   describe('schema', () => {

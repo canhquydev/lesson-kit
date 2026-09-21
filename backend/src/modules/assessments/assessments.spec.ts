@@ -1,6 +1,7 @@
 import { validate, validateSync } from 'class-validator';
 import { Types } from 'mongoose';
 import { GenerationContext } from '../../common/interfaces';
+import { SupportLevel } from '../../common/enums';
 import { AssessmentQuestionType } from './constants/assessment-question-type.enum';
 import {
   AssessmentItemDto,
@@ -24,7 +25,7 @@ describe('Assessments Day 1 artifacts', () => {
     title: "Newton's laws",
     content: 'Force changes the motion of an object.',
     duration: 45,
-    supportLevel: 'B1',
+    supportLevel: SupportLevel.B1,
   };
 
   // ---------------------------------------------------------------------------

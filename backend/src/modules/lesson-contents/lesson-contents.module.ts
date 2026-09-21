@@ -15,6 +15,6 @@ import { LessonContentsController } from './lesson-contents.controller';
   ],
   controllers: [LessonContentsController],
   providers: [LessonContentsService],
-  exports: [LessonContentsService],
+  exports: [LessonContentsService, MongooseModule],
 })
 export class LessonContentsModule {}

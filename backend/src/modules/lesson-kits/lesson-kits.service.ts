@@ -64,7 +64,7 @@ export class LessonKitsService {
     page: number;
     limit: number;
   }> {
-    const skip = (page - 1) * limit;
+    const skip = Math.max(0, (page - 1) * limit);
     const [data, total] = await Promise.all([
       this.lessonKitModel
         .find()
@@ -105,6 +105,7 @@ export class LessonKitsService {
 
     return {
       ...kit,
+      _id: kit._id.toString(),
       vocabularies,
       classroom_expressions,
       activities,
@@ -124,7 +125,7 @@ export class LessonKitsService {
       updateData.generation_time_ms = generationTimeMs;
     }
     const result = await this.lessonKitModel
-      .findByIdAndUpdate(id, updateData)
+      .findByIdAndUpdate(id, updateData, { returnDocument: 'after' })
       .exec();
     if (!result) {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
@@ -142,7 +143,7 @@ export class LessonKitsService {
 
   async updateCurrentStep(id: string, step: string): Promise<void> {
     const result = await this.lessonKitModel
-      .findByIdAndUpdate(id, { current_step: step })
+      .findByIdAndUpdate(id, { current_step: step }, { returnDocument: 'after' })
       .exec();
     if (!result) {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
@@ -245,13 +246,23 @@ export class LessonKitsService {
       this.logger.warn(
         `Transaction failed (${(err as Error).message}), falling back to direct deletion`,
       );
-      await Promise.all(
-        LESSON_KIT_COMPONENTS.map((comp) =>
-          db.collection(comp.name).deleteMany({ lesson_kit_id: kitObjectId }),
-        ),
-      );
-      await this.lessonKitModel.findByIdAndDelete(id).exec();
-      this.logger.log(`Deleted kit ${id} and all components`);
+
+      // Fallback: delete sequentially and throw if any step fails
+      try {
+        for (const comp of LESSON_KIT_COMPONENTS) {
+          await db
+            .collection(comp.name)
+            .deleteMany({ lesson_kit_id: kitObjectId });
+        }
+        await this.lessonKitModel.findByIdAndDelete(id).exec();
+        this.logger.log(`Deleted kit ${id} and all components (fallback)`);
+      } catch (fallbackErr) {
+        this.logger.error(
+          `Fallback deletion failed for kit ${id}: ${(fallbackErr as Error).message}`,
+          (fallbackErr as Error).stack,
+        );
+        throw fallbackErr;
+      }
     }
   }
 
@@ -259,17 +270,19 @@ export class LessonKitsService {
    * Tiếp tục/thử lại quá trình tạo cho Lesson Kit bị thất bại
    */
   async retry(id: string): Promise<{ lesson_kit_id: string; status: string }> {
-    const kit = await this.lessonKitModel.findById(id).exec();
+    const kit = await this.lessonKitModel.findOneAndUpdate(
+      { _id: id, status: { $ne: LessonKitStatus.GENERATING } },
+      { status: LessonKitStatus.GENERATING },
+      { returnDocument: 'after' },
+    ).exec();
+
     if (!kit) {
-      throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+      const exists = await this.lessonKitModel.exists({ _id: id });
+      if (!exists) {
+        throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
+      }
+      throw new BadRequestException('Lesson Kit is currently being generated');
     }
-
-    if (kit.status === LessonKitStatus.GENERATING) {
-      throw new BadRequestException('Lesson Kit đang trong quá trình tạo');
-    }
-
-    kit.status = LessonKitStatus.GENERATING;
-    await kit.save();
 
     this.logger.log(
       `Retrying generation for kit: ${id} from step: ${kit.current_step}`,

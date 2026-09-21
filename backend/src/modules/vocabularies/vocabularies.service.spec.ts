@@ -6,6 +6,7 @@ import { Vocabulary } from './schemas/vocabulary.schema';
 import { AiService } from '../ai/ai.service';
 import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { GenerationContext } from '../../common/interfaces';
+import { SupportLevel } from '../../common/enums';
 
 describe('VocabulariesService', () => {
   let service: VocabulariesService;
@@ -20,7 +21,7 @@ describe('VocabulariesService', () => {
     content:
       'Nội dung bài học về vận tốc, quãng đường, thời gian trong chuyển động thẳng đều.',
     duration: 45,
-    supportLevel: 'B1',
+    supportLevel: SupportLevel.B1,
   };
 
   const sampleValidVocabularies = Array.from({ length: 10 }).map((_, i) => ({

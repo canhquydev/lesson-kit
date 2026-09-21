@@ -20,7 +20,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let error: any = undefined;
+    let error: unknown = undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -28,20 +28,33 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
-        const res = exceptionResponse as any;
-        message = res.message || exception.message;
+      } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+        const res = exceptionResponse as Record<string, unknown>;
+        const rawMessage = res.message || exception.message;
+        message = Array.isArray(rawMessage)
+          ? rawMessage.join('; ')
+          : String(rawMessage);
         error = res.error;
       }
-    } else if (exception instanceof Error) {
-      message = exception.message;
     }
 
+    let logMessage = message;
+    if (exception instanceof Error && !(exception instanceof HttpException)) {
+      logMessage = exception.message;
+    } else if (typeof exception === 'string') {
+      logMessage = exception;
+    } else if (typeof exception === 'object' && exception !== null && !(exception instanceof HttpException)) {
+      try {
+        logMessage = JSON.stringify(exception);
+      } catch {
+        logMessage = '[Unserializable Object]';
+      }
+    }
     this.logger.error(
-      `${request.method} ${request.url} - ${status}: ${message}`,
+      `${request.method} ${request.url} - ${status}: ${logMessage}`,
       exception instanceof Error ? exception.stack : undefined,
     );
 
-    response.status(status).json(BaseResponseDto.fail(message, error));
+    response.status(status).json(BaseResponseDto.fail(message, error as string | Record<string, unknown>));
   }
 }

@@ -11,7 +11,7 @@ export class LessonContent {
   @Prop({ required: true })
   lesson: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   subject: string;
 
   @Prop({ required: true })
@@ -23,4 +23,4 @@ export class LessonContent {
 
 export const LessonContentSchema = SchemaFactory.createForClass(LessonContent);
 
-LessonContentSchema.index({ subject: 1, grade: 1 });
+LessonContentSchema.index({ subject: 1, grade: 1, lesson: 1 });

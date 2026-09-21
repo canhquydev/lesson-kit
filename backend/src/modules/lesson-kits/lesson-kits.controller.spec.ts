@@ -90,7 +90,7 @@ describe('LessonKitsController', () => {
       const mockList = [{ _id: 'kit_1' }, { _id: 'kit_2' }];
       mockLessonKitsService.findAll.mockResolvedValue(mockList);
 
-      const response = await controller.findAll('1', '10');
+      const response = await controller.findAll(1, 10);
 
       expect(service.findAll).toHaveBeenCalledWith(1, 10);
       expect(response.success).toBe(true);
@@ -156,11 +156,11 @@ describe('LessonKitsController', () => {
       };
       mockRegenerateService.regenerate.mockResolvedValue(mockResult);
 
-      const response = await controller.regenerate('kit_123', 'vocabulary');
+      const response = await controller.regenerate('kit_123', ComponentType.VOCABULARY);
 
       expect(mockRegenerateService.regenerate).toHaveBeenCalledWith(
         'kit_123',
-        'vocabulary',
+        ComponentType.VOCABULARY,
       );
       expect(response.success).toBe(true);
       expect(response.data).toEqual(mockResult);
@@ -181,6 +181,23 @@ describe('LessonKitsController', () => {
       const subscription = stream$.subscribe({
         next: (event) => {
           expect(event.data).toBeDefined();
+          subscription.unsubscribe();
+          done();
+        },
+      });
+    });
+
+    it('should propagate error when getStatus fails (stream terminates)', (done) => {
+      mockLessonKitsService.getStatus.mockRejectedValue(
+        new Error('Kit not found'),
+      );
+
+      const stream$ = controller.progressStream('kit_123');
+      expect(stream$).toBeDefined();
+
+      const subscription = stream$.subscribe({
+        error: (err) => {
+          expect(err.message).toBe('Kit not found');
           subscription.unsubscribe();
           done();
         },

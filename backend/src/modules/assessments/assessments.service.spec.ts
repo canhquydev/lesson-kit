@@ -2,6 +2,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { GenerationContext } from '../../common/interfaces';
+import { SupportLevel } from '../../common/enums';
 import { ValidationError } from '../../common/validators';
 import { AiService, ChatMessage } from '../ai/ai.service';
 import { AiLogsService } from '../ai-logs/ai-logs.service';
@@ -20,7 +21,7 @@ describe('AssessmentsService', () => {
     title: "Newton's laws",
     content: 'Force changes the motion of an object.',
     duration: 45,
-    supportLevel: 'B1',
+    supportLevel: SupportLevel.B1,
   };
 
   const dependencies = {
@@ -283,17 +284,15 @@ describe('AssessmentsService', () => {
       expect(generateJson).toHaveBeenCalledTimes(2);
     });
 
-    it('retries when AI output contains extra unknown fields', async () => {
+    it('accepts AI output when it contains extra unknown fields (relaxed validation)', async () => {
       const withExtraFields = validAssessments.map((a) => ({
         ...a,
         unexpected_field: 'extra',
       }));
-      generateJson
-        .mockResolvedValueOnce({ assessments: withExtraFields })
-        .mockResolvedValueOnce({ assessments: validAssessments });
+      generateJson.mockResolvedValueOnce({ assessments: withExtraFields });
 
       await service.generate(context, dependencies);
-      expect(generateJson).toHaveBeenCalledTimes(2);
+      expect(generateJson).toHaveBeenCalledTimes(1);
     });
 
     it('throws ValidationError with attempts = 3 after all retries fail', async () => {

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { LessonKitStatus } from '../../common/enums';
+import { LessonKitStatus, SupportLevel } from '../../common/enums';
 import { GenerationContext } from '../../common/interfaces';
 import { ActivitiesService } from '../activities/activities.service';
 import { AssessmentsService } from '../assessments/assessments.service';
@@ -116,7 +116,7 @@ export class GenerationService {
         title: kit.lesson_topic || lessonContent.title,
         content: lessonContent.content,
         duration: kit.duration,
-        supportLevel: kit.support_level,
+        supportLevel: kit.support_level as SupportLevel,
       };
 
       // -----------------------------------------------------------------------

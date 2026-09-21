@@ -6,6 +6,7 @@ import { ClassroomExpression } from './schemas/classroom-expression.schema';
 import { AiService } from '../ai/ai.service';
 import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { GenerationContext } from '../../common/interfaces';
+import { SupportLevel } from '../../common/enums';
 
 describe('ClassroomExpressionsService', () => {
   let service: ClassroomExpressionsService;
@@ -19,7 +20,7 @@ describe('ClassroomExpressionsService', () => {
     title: 'Chuyển động thẳng đều',
     content: 'Bài học vật lí 10...',
     duration: 45,
-    supportLevel: 'B1',
+    supportLevel: SupportLevel.B1,
   };
 
   const sampleValidExpressions = [

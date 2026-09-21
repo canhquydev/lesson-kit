@@ -54,13 +54,15 @@ describe('LessonContentsService', () => {
   });
 
   describe('findById', () => {
+    const validId = '507f1f77bcf86cd799439011';
+
     it('should return lesson if found', async () => {
-      const mockLesson = { _id: '123', title: 'Định luật Newton' };
+      const mockLesson = { _id: validId, title: 'Định luật Newton' };
       mockLessonContentModel.findById.mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockLesson),
       });
 
-      const result = await service.findById('123');
+      const result = await service.findById(validId);
       expect(result).toEqual(mockLesson);
     });
 
@@ -69,7 +71,13 @@ describe('LessonContentsService', () => {
         exec: jest.fn().mockResolvedValue(null),
       });
 
-      await expect(service.findById('non_existing_id')).rejects.toThrow(
+      await expect(service.findById(validId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw NotFoundException for invalid ObjectId format', async () => {
+      await expect(service.findById('invalid-id')).rejects.toThrow(
         NotFoundException,
       );
     });

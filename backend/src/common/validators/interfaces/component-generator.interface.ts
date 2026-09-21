@@ -33,7 +33,7 @@ export interface ComponentGenerator<T, TDependencies = ComponentDependencies> {
   // Kiểm tra tính hợp lệ về cấu trúc và nghiệp vụ của dữ liệu do AI trả về
   validate(data: any[]): ValidationResult;
 
-  // Sinh câu prompt gửi cho A
+  // Sinh câu prompt gửi cho AI
   getPrompt(
     context: GenerationContext,
     dependencies?: TDependencies,

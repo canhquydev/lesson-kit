@@ -6,6 +6,7 @@ import { Activity } from './schemas/activity.schema';
 import { AiService } from '../ai/ai.service';
 import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { GenerationContext } from '../../common/interfaces';
+import { SupportLevel } from '../../common/enums';
 
 describe('ActivitiesService', () => {
   let service: ActivitiesService;
@@ -19,7 +20,7 @@ describe('ActivitiesService', () => {
     title: 'Chuyển động thẳng đều',
     content: 'Nội dung bài học vật lí 10...',
     duration: 45,
-    supportLevel: 'B1',
+    supportLevel: SupportLevel.B1,
   };
 
   const sampleValidActivities = [

@@ -13,15 +13,22 @@ import {
   Sse,
   MessageEvent,
   Header,
+  ParseEnumPipe,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { Observable, fromEvent, interval, merge, defer } from 'rxjs';
-import { map, filter } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LessonKitsService } from './lesson-kits.service';
 import { CreateLessonKitDto } from './dto';
 import { BaseResponseDto } from '../../common/dto';
 import { ParseMongoIdPipe } from '../../common/pipes';
 import { RegenerateService } from '../generation/regenerate.service';
+import { ComponentType } from '../../common/enums';
+
+const MAX_PAGINATION_LIMIT = 100;
+const HEARTBEAT_INTERVAL_MS = 15000;
 
 @Controller('api/lesson-kit')
 export class LessonKitsController {
@@ -43,10 +50,13 @@ export class LessonKitsController {
   }
 
   @Get()
-  async findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 10;
-    const data = await this.lessonKitsService.findAll(pageNum, limitNum);
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(1, limit), MAX_PAGINATION_LIMIT);
+    const data = await this.lessonKitsService.findAll(safePage, safeLimit);
     return BaseResponseDto.ok(data, 'Danh sách Lesson Kit');
   }
 
@@ -69,19 +79,15 @@ export class LessonKitsController {
     @Param('id', ParseMongoIdPipe) id: string,
   ): Observable<MessageEvent> {
     const initial$ = defer(async () => {
-      try {
-        const current = await this.lessonKitsService.getStatus(id);
-        return { data: current } as MessageEvent;
-      } catch {
-        return null;
-      }
-    }).pipe(filter((msg): msg is MessageEvent => msg !== null));
+      const current = await this.lessonKitsService.getStatus(id);
+      return { data: current } as MessageEvent;
+    });
 
     const event$ = fromEvent(this.eventEmitter, `kit.${id}.progress`).pipe(
       map((payload) => ({ data: payload } as MessageEvent)),
     );
 
-    const heartbeat$ = interval(15000).pipe(
+    const heartbeat$ = interval(HEARTBEAT_INTERVAL_MS).pipe(
       map(() => ({ data: { type: 'heartbeat' } } as MessageEvent)),
     );
 
@@ -110,9 +116,10 @@ export class LessonKitsController {
   @Post(':id/regenerate/:component')
   async regenerate(
     @Param('id', ParseMongoIdPipe) id: string,
-    @Param('component') component: string,
+    @Param('component', new ParseEnumPipe(ComponentType)) component: ComponentType,
   ) {
     const result = await this.regenerateService.regenerate(id, component);
     return BaseResponseDto.ok(result, `Đã tạo lại ${component}`);
   }
 }
+

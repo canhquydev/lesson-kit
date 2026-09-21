@@ -32,6 +32,8 @@ describe('LessonKitsService', () => {
       findById: jest.fn(),
       findByIdAndUpdate: jest.fn(),
       findByIdAndDelete: jest.fn(),
+      findOneAndUpdate: jest.fn(),
+      exists: jest.fn(),
       db: {
         collection: jest.fn().mockReturnValue(mockDbCollection),
       },
@@ -145,6 +147,7 @@ describe('LessonKitsService', () => {
 
       expect(result).toEqual({
         ...mockKit,
+        _id: validObjectId.toHexString(),
         vocabularies: mockComponents,
         classroom_expressions: mockComponents,
         activities: mockComponents,
@@ -185,6 +188,7 @@ describe('LessonKitsService', () => {
           status: LessonKitStatus.COMPLETED,
           generation_time_ms: 15000,
         },
+        { returnDocument: 'after' },
       );
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'kit.kit_123.progress',
@@ -212,6 +216,7 @@ describe('LessonKitsService', () => {
       expect(mockLessonKitModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'kit_123',
         { current_step: 'phase2' },
+        { returnDocument: 'after' },
       );
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'kit.kit_123.progress',
@@ -330,9 +335,10 @@ describe('LessonKitsService', () => {
 
   describe('retry', () => {
     it('should throw NotFoundException if kit does not exist', async () => {
-      mockLessonKitModel.findById.mockReturnValue({
+      mockLessonKitModel.findOneAndUpdate.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
+      mockLessonKitModel.exists.mockResolvedValue(null);
 
       await expect(service.retry('6aa6ba0de07b9eacdba50a66')).rejects.toThrow(
         NotFoundException,
@@ -343,32 +349,34 @@ describe('LessonKitsService', () => {
       const mockKit = {
         _id: new Types.ObjectId(),
         status: LessonKitStatus.GENERATING,
-        save: jest.fn(),
       };
-      mockLessonKitModel.findById.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockKit),
+      mockLessonKitModel.findOneAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
       });
+      mockLessonKitModel.exists.mockResolvedValue({ _id: mockKit._id });
 
       await expect(service.retry(mockKit._id.toHexString())).rejects.toThrow(
         BadRequestException,
       );
     });
 
-    it('should set status to GENERATING and emit lesson-kit.generate event', async () => {
+    it('should atomically set status to GENERATING and emit lesson-kit.generate event', async () => {
       const mockKit = {
         _id: new Types.ObjectId(),
-        status: LessonKitStatus.FAILED,
+        status: LessonKitStatus.GENERATING,
         current_step: 'phase1_activities',
-        save: jest.fn().mockResolvedValue(true),
       };
-      mockLessonKitModel.findById.mockReturnValue({
+      mockLessonKitModel.findOneAndUpdate.mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockKit),
       });
 
       const result = await service.retry(mockKit._id.toHexString());
 
-      expect(mockKit.status).toBe(LessonKitStatus.GENERATING);
-      expect(mockKit.save).toHaveBeenCalled();
+      expect(mockLessonKitModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: mockKit._id.toHexString(), status: { $ne: LessonKitStatus.GENERATING } },
+        { status: LessonKitStatus.GENERATING },
+        { returnDocument: 'after' },
+      );
       expect(mockEventEmitter.emit).toHaveBeenCalledWith('lesson-kit.generate', {
         lessonKitId: mockKit._id.toHexString(),
       });

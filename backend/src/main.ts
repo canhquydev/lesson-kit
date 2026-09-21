@@ -20,11 +20,17 @@ async function bootstrap() {
   // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // CORS
-  app.enableCors();
+  // CORS: Mở toàn bộ cho mọi nguồn gốc (tự động phản chiếu origin, hỗ trợ cả credentials)
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Server running on http://localhost:${port}`);
 }
-void bootstrap();
+bootstrap().catch((err) => {
+  new Logger('Bootstrap').error('Bootstrap failed', err);
+  process.exit(1);
+});
