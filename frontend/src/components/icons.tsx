@@ -3,6 +3,7 @@ import type { SVGProps } from "react"
 type P = SVGProps<SVGSVGElement>
 
 const base = (p: P) => ({
+  "aria-hidden": p["aria-label"] || p["aria-labelledby"] ? undefined : true,
   width: 18,
 
   height: 18,

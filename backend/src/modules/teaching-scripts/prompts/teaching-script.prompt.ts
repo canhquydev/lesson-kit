@@ -78,30 +78,15 @@ export function buildStepSkeleton(
     (sum, a) => sum + a.duration_minutes,
     0,
   );
-  let remaining = totalDuration - activitySum;
-
-  // Safety net: nếu activities chiếm quá nhiều, scale down proportionally
-  const mutableActivities = activities.map((a) => ({ ...a }));
-  if (remaining < 5) {
-    const maxActivityTime = Math.floor(totalDuration * 0.6);
-    const scale = maxActivityTime / Math.max(activitySum, 1);
-    for (const a of mutableActivities) {
-      a.duration_minutes = Math.max(2, Math.round(a.duration_minutes * scale));
-    }
-    const newSum = mutableActivities.reduce(
-      (s, a) => s + a.duration_minutes,
-      0,
-    );
-    remaining = totalDuration - newSum;
-  }
+  const remaining = totalDuration - activitySum;
 
   const steps: StepSkeleton[] = [];
   let order = 1;
 
   if (remaining < 7) {
     // Không đủ cho 3 bước riêng → Intro + gộp Assessment & Wrap-up
-    const intro = Math.max(2, Math.floor(remaining / 2));
-    const assessWrapup = remaining - intro;
+    const intro = Math.max(1, Math.floor(remaining / 2));
+    const assessWrapup = Math.max(1, remaining - intro);
 
     steps.push({
       step_order: order++,
@@ -110,7 +95,7 @@ export function buildStepSkeleton(
       role: 'intro',
     });
 
-    for (const activity of mutableActivities) {
+    for (const activity of activities) {
       steps.push({
         step_order: order++,
         activity_name: activity.activity_name,
@@ -138,7 +123,7 @@ export function buildStepSkeleton(
       role: 'intro',
     });
 
-    for (const activity of mutableActivities) {
+    for (const activity of activities) {
       steps.push({
         step_order: order++,
         activity_name: activity.activity_name,

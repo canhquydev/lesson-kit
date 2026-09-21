@@ -154,8 +154,8 @@ function escapeHtml(str: string): string {
 
 function toLatex(formula: string): string {
   let s = formula.trim()
-  // Format scientific multiplication: 2.10^-6 -> 2 \cdot 10^{-6}
-  s = s.replace(/(\d+)\.(\d+)\^([-+]?\d+)/g, "$1 \\cdot $2^{$3}")
+  // Format scientific multiplication specifically for base 10: 2.10^-6 -> 2 \cdot 10^{-6}
+  s = s.replace(/(\d+(?:\.\d+)?)\s*\.\s*10\^([-+]?\d+)/g, "$1 \\cdot 10^{$2}")
   // Format powers: x^2, 10^-6, 10^4
   s = s.replace(/([a-zA-Z0-9]+)\^([-+]?[0-9a-zA-Z]+)/g, "$1^{$2}")
   // Format subscripts: W_M -> W_{M}, A_MN -> A_{MN}
@@ -164,33 +164,35 @@ function toLatex(formula: string): string {
 }
 
 function renderTextSegment(text: string): string {
-  let s = escapeHtml(text)
+  const tokenRegex = /\b([A-Za-z]+)_([A-Za-z0-9]+)\b|\b(\d+(?:\.\d+)?)\^([-+]?\d+)\b/g
+  let result = ""
+  let lastIndex = 0
+  let m: RegExpExecArray | null
 
-  // Standalone subscripts: W_M, V_M, A_MN
-  s = s.replace(/\b([A-Za-z]+)_([A-Za-z0-9]+)\b/g, (m, v, sub) => {
+  while ((m = tokenRegex.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, m.index))
+    const fullMatch = m[0]
     try {
-      return katex.renderToString(`${v}_{${sub}}`, {
-        throwOnError: false,
-        displayMode: false,
-      })
+      if (m[1] && m[2]) {
+        result += katex.renderToString(`${m[1]}_{${m[2]}}`, {
+          throwOnError: false,
+          displayMode: false,
+        })
+      } else if (m[3] && m[4]) {
+        result += katex.renderToString(`${m[3]}^{${m[4]}}`, {
+          throwOnError: false,
+          displayMode: false,
+        })
+      } else {
+        result += escapeHtml(fullMatch)
+      }
     } catch {
-      return m
+      result += escapeHtml(fullMatch)
     }
-  })
-
-  // Standalone powers: 10^-6, 10^4
-  s = s.replace(/\b(\d+(?:\.\d+)?)\^([-+]?\d+)\b/g, (m, b, p) => {
-    try {
-      return katex.renderToString(`${b}^{${p}}`, {
-        throwOnError: false,
-        displayMode: false,
-      })
-    } catch {
-      return m
-    }
-  })
-
-  return s
+    lastIndex = tokenRegex.lastIndex
+  }
+  result += escapeHtml(text.slice(lastIndex))
+  return result
 }
 
 export function renderMathHtml(text?: string): string {
@@ -233,12 +235,11 @@ export function renderMathHtml(text?: string): string {
           break
         }
       } else {
+        currentOffset += part.length
         if (openParens <= 0) {
           break
-        } else {
-          currentOffset += part.length
-          lastRhsEndOffset = currentOffset
         }
+        lastRhsEndOffset = currentOffset
       }
     }
 

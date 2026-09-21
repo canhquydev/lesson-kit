@@ -81,21 +81,40 @@ export function CreateForm({
   // ─── Load subjects + options on mount ───
 
   useEffect(() => {
-    Promise.all([getSubjects(), getOptions()])
+    let active = true
 
-      .then(([subs, opts]) => {
+    async function loadConfig() {
+      try {
+        const [subs, opts] = await Promise.all([getSubjects(), getOptions()])
+        if (!active) return
+
         setSubjects(subs)
-
         setDurations(opts.durations)
-
         setSupportLevels(opts.support_levels)
 
         if (subs.length > 0) setSubject(subs[0].code)
-      })
 
-      .catch(() => toast("Không thể tải cấu hình", "error"))
+        if (opts.durations.length > 0 && !opts.durations.includes(45)) {
+          setDuration(String(opts.durations[0]))
+        }
+        if (
+          opts.support_levels.length > 0 &&
+          !opts.support_levels.some((s) => s.code === "B1")
+        ) {
+          setCefr(opts.support_levels[0].code)
+        }
+      } catch {
+        if (active) toast("Không thể tải cấu hình", "error")
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
 
-      .finally(() => setLoading(false))
+    loadConfig()
+
+    return () => {
+      active = false
+    }
   }, [])
 
   // ─── Load lessons when subject/grade changes ───
@@ -103,13 +122,26 @@ export function CreateForm({
   useEffect(() => {
     if (!subject || !grade) return
 
-    setLessonId("")
+    let isSubscribed = true
 
-    getLessons(subject, grade)
+    async function fetchLessons() {
+      try {
+        const data = await getLessons(subject, grade)
+        if (isSubscribed) {
+          setLessons(data)
+        }
+      } catch {
+        if (isSubscribed) {
+          setLessons([])
+        }
+      }
+    }
 
-      .then(setLessons)
+    fetchLessons()
 
-      .catch(() => setLessons([]))
+    return () => {
+      isSubscribed = false
+    }
   }, [subject, grade])
 
   // ─── Derived ───
@@ -146,7 +178,7 @@ export function CreateForm({
     label: CEFR_NAMES[s.code] || s.name,
   }))
 
-  const ready = subject && grade && lessonId && duration && cefr && !generating
+  const ready = subject && grade && selectedLesson && duration && cefr && !generating
 
   async function handleGenerate() {
     if (!selectedLesson) return
@@ -175,7 +207,7 @@ export function CreateForm({
       onGenerate(res.lesson_kit_id, data)
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : "Lỗi khi tạo kit", "error")
-
+    } finally {
       setGenerating(false)
     }
   }

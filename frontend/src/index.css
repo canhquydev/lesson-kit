@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 @import 'katex/dist/katex.min.css';
 
@@ -28,24 +27,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Hide scrollbars until scrolling */
-* {
+/* Custom scrollbars */
+html,
+body,
+.custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-*:hover {
   scrollbar-color: #cbd5e1 transparent;
 }
-*::-webkit-scrollbar {
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-*::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 8px;
-}
-*:hover::-webkit-scrollbar-thumb {
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
+  border-radius: 8px;
 }
 
 @keyframes lk-pulse-dot {
@@ -83,10 +82,16 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+.lk-fade-in {
+  animation: lk-fade-in 0.15s ease both;
+}
 
 @keyframes lk-scale-in {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+.lk-scale-in {
+  animation: lk-scale-in 0.2s ease both;
 }
 
 ::selection {
@@ -105,4 +110,17 @@ body {
   bottom: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   animation: lk-shimmer 1.8s infinite ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-pulse-dot,
+  .lk-spin,
+  .lk-glow,
+  .lk-fade-up,
+  .lk-fade-in,
+  .lk-scale-in,
+  .lk-shimmer {
+    animation: none !important;
+    transition: none !important;
+  }
 }

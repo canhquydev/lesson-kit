@@ -4,6 +4,8 @@ export type Route =
   | { view: "progress"; kitId: string }
   | { view: "detail"; kitId: string; tab?: string }
 
+export const DEFAULT_TAB_SLUG = "tu-vung"
+
 export const TAB_TO_SLUG: Record<string, string> = {
   "Từ vựng": "tu-vung",
   "Mẫu câu": "mau-cau",
@@ -38,8 +40,10 @@ export function parseCurrentRoute(): Route {
   // Support hash fallback if present (e.g. #/kit/123?tab=danh-gia)
   if (window.location.hash.startsWith("#/")) {
     const hashVal = window.location.hash.slice(1)
-    const [hPath, hSearch] = hashVal.split("?")
-    path = hPath || "/"
+    const qIndex = hashVal.indexOf("?")
+    const hPath = qIndex >= 0 ? hashVal.slice(0, qIndex) : hashVal
+    const hSearch = qIndex >= 0 ? hashVal.slice(qIndex + 1) : ""
+    path = hPath.replace(/\/+$/, "") || "/"
     if (hSearch) search = "?" + hSearch
   }
 
@@ -52,21 +56,27 @@ export function parseCurrentRoute(): Route {
   }
 
   // Route: /progress/:id
-  const progressMatch = path.match(/^\/progress\/([a-zA-Z0-9_-]+)/)
+  const progressMatch = path.match(/^\/progress\/([a-zA-Z0-9_-]+)$/)
   if (progressMatch) {
     return { view: "progress", kitId: progressMatch[1] }
   }
 
   // Route: /kit/:id/:tab or /kit/:id
-  const kitMatch = path.match(/^\/kit\/([a-zA-Z0-9_-]+)(?:\/([a-zA-Z0-9_-]+))?/)
+  const kitMatch = path.match(/^\/kit\/([a-zA-Z0-9_-]+)(?:\/([a-zA-Z0-9_-]+))?$/)
   if (kitMatch) {
     const kitId = kitMatch[1]
     const pathTab = kitMatch[2]
     const tabSlug = (tabQuery || pathTab || "").toLowerCase()
+    let storedTab: string | null = null
+    try {
+      storedTab = localStorage.getItem(`kit_${kitId}_tab`)
+    } catch {}
+
     const resolvedTab =
       SLUG_TO_TAB[tabSlug] ||
-      localStorage.getItem(`kit_${kitId}_tab`) ||
-      undefined
+      (storedTab
+        ? SLUG_TO_TAB[storedTab.toLowerCase()] || (TAB_TO_SLUG[storedTab] ? storedTab : undefined)
+        : undefined)
 
     return { view: "detail", kitId, tab: resolvedTab }
   }
@@ -75,10 +85,14 @@ export function parseCurrentRoute(): Route {
 }
 
 export function navigateTo(url: string, replace = false) {
-  if (replace) {
-    window.history.replaceState({}, "", url)
-  } else {
-    window.history.pushState({}, "", url)
+  try {
+    if (replace) {
+      window.history.replaceState({}, "", url)
+    } else {
+      window.history.pushState({}, "", url)
+    }
+    window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }))
+  } catch (err) {
+    console.error("Navigation error:", err)
   }
-  window.dispatchEvent(new PopStateEvent("popstate"))
 }

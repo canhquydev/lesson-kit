@@ -90,6 +90,7 @@ export function Progress({
   const [retrying, setRetrying] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isListeningRef = useRef(false)
 
   const handleStatusUpdate = useCallback((data: Partial<GenerationStatus>) => {
     if (data.current_step) setCurrentStep(data.current_step)
@@ -106,14 +107,8 @@ export function Progress({
     }
 
     const backendPhase = stepToPhase(data.current_step)
-    const minPhaseFloor =
-      backendPhase === 1
-        ? 3
-        : backendPhase === 2
-          ? 38
-          : backendPhase === 3
-            ? 72
-            : 3
+    const phaseFloors: Record<number, number> = { 1: 8, 2: 38, 3: 72, 4: 100 }
+    const minPhaseFloor = phaseFloors[backendPhase] ?? 3
 
     // Ensure progress never jumps backwards
     setDisplayProgress((prev) =>
@@ -122,6 +117,7 @@ export function Progress({
   }, [])
 
   const stopAllListeners = useCallback(() => {
+    isListeningRef.current = false
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
       eventSourceRef.current = null
@@ -134,32 +130,42 @@ export function Progress({
 
   const startFallbackPolling = useCallback(() => {
     if (fallbackTimerRef.current) return
+    isListeningRef.current = true
     const pollFallback = async () => {
       try {
         const data = await getKitStatus(kitId)
+        if (!isListeningRef.current || !fallbackTimerRef.current) return
         handleStatusUpdate(data)
         if (data.status !== "completed" && data.status !== "failed") {
           fallbackTimerRef.current = setTimeout(pollFallback, 3500)
         }
       } catch {
-        fallbackTimerRef.current = setTimeout(pollFallback, 5000)
+        if (isListeningRef.current && fallbackTimerRef.current) {
+          fallbackTimerRef.current = setTimeout(pollFallback, 5000)
+        }
       }
     }
     fallbackTimerRef.current = setTimeout(pollFallback, 2500)
   }, [kitId, handleStatusUpdate])
 
-  const connectStream = useCallback(() => {
+  const connectStream = useCallback(async () => {
     stopAllListeners()
+    isListeningRef.current = true
 
-    // 1. Fetch current status once on connect (immediate state restoration on F5)
-    getKitStatus(kitId)
-      .then((data) => {
-        handleStatusUpdate(data)
-        if (data.status === "completed" || data.status === "failed") {
-          return
-        }
-      })
-      .catch(() => {})
+    // 1. Fetch current status once before opening SSE (immediate state restoration on F5)
+    try {
+      const data = await getKitStatus(kitId)
+      if (!isListeningRef.current) return
+      handleStatusUpdate(data)
+      if (data.status === "completed" || data.status === "failed") {
+        stopAllListeners()
+        return
+      }
+    } catch {
+      // Proceed to SSE or fallback polling if initial fetch encounters network issue
+    }
+
+    if (!isListeningRef.current) return
 
     // 2. Open EventSource stream for real-time progress updates
     try {
@@ -196,7 +202,7 @@ export function Progress({
 
   // Initialize stream on mount
   useEffect(() => {
-    connectStream()
+    void connectStream()
     return () => {
       stopAllListeners()
     }
@@ -208,7 +214,7 @@ export function Progress({
       await retryLessonKit(kitId)
       setStatus("generating")
       toast("Đang thử lại từ bước bị gián đoạn...", "info")
-      connectStream()
+      void connectStream()
     } catch (err) {
       toast(err instanceof Error ? err.message : "Thử lại thất bại", "error")
     } finally {
@@ -254,8 +260,9 @@ export function Progress({
       setDisplayProgress((prev) => {
         // Ceiling and floor per phase
         const target =
-          phase === 1 ? 38 : phase === 2 ? 72 : phase === 3 ? 95 : 10
-        const floor = phase === 1 ? 3 : phase === 2 ? 38 : phase === 3 ? 72 : 3
+          phase === 1 ? 38 : phase === 2 ? 72 : phase === 3 ? 95 : phase === 4 ? 100 : 10
+        const floor =
+          phase === 1 ? 3 : phase === 2 ? 38 : phase === 3 ? 72 : phase === 4 ? 100 : 3
 
         let cur = prev < floor ? floor : prev
         const remaining = target - cur

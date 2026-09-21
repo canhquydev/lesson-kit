@@ -17,6 +17,8 @@ export function Combobox({
 
   placeholder = "Select...",
 
+  searchPlaceholder = "Tìm kiếm...",
+
   searchable = false,
 
   className = "",
@@ -30,6 +32,8 @@ export function Combobox({
   options: Option[]
 
   placeholder?: string
+
+  searchPlaceholder?: string
 
   searchable?: boolean
 
@@ -45,7 +49,10 @@ export function Combobox({
     if (!open) return
 
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery("")
+      }
     }
 
     document.addEventListener("mousedown", onDoc)
@@ -108,7 +115,7 @@ export function Combobox({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Tìm bài học..."
+                  placeholder={searchPlaceholder}
                   className="w-full bg-transparent text-[13.5px] text-slate-800 outline-none placeholder:text-slate-400"
                 />
               </div>
@@ -417,26 +424,31 @@ const toastConfig: Record<ToastType, {
 
 export function ToastContainer() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   useEffect(() => {
+    const activeTimers = timersRef.current
+
     const handleToast = (e: Event) => {
       const customEvent = e as CustomEvent<ToastItem>
+      const detail = customEvent.detail
+      if (!detail || typeof detail.id !== "number" || typeof detail.message !== "string") return
 
-      if (!customEvent.detail) return
+      setToasts((prev) => [...prev, detail])
 
-      const item = customEvent.detail
-
-      setToasts((prev) => [...prev, item])
-
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((p) => p.id !== item.id))
+      const timerId = setTimeout(() => {
+        activeTimers.delete(timerId)
+        setToasts((prev) => prev.filter((p) => p.id !== detail.id))
       }, 4000)
+      activeTimers.add(timerId)
     }
 
     window.addEventListener("app:toast", handleToast)
 
     return () => {
       window.removeEventListener("app:toast", handleToast)
+      activeTimers.forEach((id) => clearTimeout(id))
+      activeTimers.clear()
     }
   }, [])
 
@@ -504,18 +516,25 @@ export function ConfirmModal({
 
   onCancel: () => void
 }) {
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel()
+    }
+    document.addEventListener("keydown", handleKey)
+    return () => document.removeEventListener("keydown", handleKey)
+  }, [open, onCancel])
+
   if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-        style={{ animation: "lk-fade-in .15s ease" }}
+        className="lk-fade-in absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
         onClick={onCancel}
       />
       <div
-        className="relative mx-auto w-full max-w-[420px] rounded-[18px] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-900/20"
-        style={{ animation: "lk-scale-in .2s ease" }}
+        className="lk-scale-in relative mx-auto w-full max-w-[420px] rounded-[18px] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-900/20"
       >
         <div className="flex items-start gap-3.5">
           {danger && (

@@ -1,3 +1,13 @@
+import type {
+  Subject,
+  ConfigOptions,
+  LessonItem,
+  GenerateResponse,
+  GenerationStatus,
+  LessonKitDetail,
+  LessonKitListItem,
+} from "./types"
+
 // ─── Base API Helpers ───────────────────────────────────────────────
 
 const BASE =
@@ -31,10 +41,18 @@ async function request<T>(
 
   const res = await fetch(`${BASE}${path}`, opts)
 
-  const json = await res.json()
+  let json: { success?: boolean; message?: string; data?: unknown } | null = null
+  try {
+    json = await res.json()
+  } catch {
+    throw new ApiError(
+      res.status,
+      res.ok ? "Invalid JSON response" : res.statusText || "Request failed",
+    )
+  }
 
-  if (!res.ok || !json.success) {
-    throw new ApiError(res.status, json.message || "Request failed")
+  if (!res.ok || !json?.success) {
+    throw new ApiError(res.status, json?.message || "Request failed")
   }
 
   return json.data as T
@@ -49,8 +67,6 @@ export const api = {
 }
 
 // ─── Config APIs ────────────────────────────────────────────────────
-
-import type { Subject, ConfigOptions, LessonItem } from "./types"
 
 export function getSubjects() {
   return api.get<Subject[]>("/config/subjects")
@@ -67,13 +83,6 @@ export function getLessons(subject: string, grade: string) {
 }
 
 // ─── Lesson Kit APIs ────────────────────────────────────────────────
-
-import type {
-  GenerateResponse,
-  GenerationStatus,
-  LessonKitDetail,
-  LessonKitListItem,
-} from "./types"
 
 export function generateLessonKit(body: {
   subject: string
@@ -103,12 +112,15 @@ export function getKitDetail(id: string) {
   return api.get<LessonKitDetail>(`/lesson-kit/${id}`)
 }
 
-export async function getKitList(page = 1, limit = 20) {
-  const res = await api.get<{ data: LessonKitListItem[]; total: number }>(
+export async function getKitList(page = 1, limit = 20): Promise<LessonKitListItem[]> {
+  const res = await api.get<{ data: LessonKitListItem[]; total: number } | LessonKitListItem[]>(
     `/lesson-kit?page=${page}&limit=${limit}`,
   )
 
-  return res.data ?? []
+  if (Array.isArray(res)) {
+    return res
+  }
+  return res?.data ?? []
 }
 
 export function deleteKit(id: string) {
@@ -120,7 +132,9 @@ export function retryLessonKit(id: string) {
 }
 
 export function regenerateComponent(kitId: string, component: string) {
-  return api.post<unknown>(`/lesson-kit/${kitId}/regenerate/${component}`)
+  return api.post<unknown>(
+    `/lesson-kit/${encodeURIComponent(kitId)}/regenerate/${encodeURIComponent(component)}`,
+  )
 }
 
 export interface RegenerateAllStaleResult {

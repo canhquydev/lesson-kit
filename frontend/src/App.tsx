@@ -14,6 +14,8 @@ import {
   parseCurrentRoute,
   navigateTo,
   TAB_TO_SLUG,
+  SLUG_TO_TAB,
+  DEFAULT_TAB_SLUG,
   type Route,
 } from "./lib/router"
 
@@ -31,19 +33,33 @@ export interface FormData {
   support_level: string
 }
 
+function getSavedTabSlug(kitId: string): string {
+  try {
+    const savedTab = localStorage.getItem(`kit_${kitId}_tab`)
+    if (!savedTab) return DEFAULT_TAB_SLUG
+    return TAB_TO_SLUG[savedTab] || (SLUG_TO_TAB[savedTab] ? savedTab : DEFAULT_TAB_SLUG)
+  } catch {
+    return DEFAULT_TAB_SLUG
+  }
+}
+
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseCurrentRoute())
 
   const [formData, setFormData] = useState<FormData | null>(null)
 
   useEffect(() => {
-    const handlePopState = () => {
+    const handleRouteChange = () => {
       setRoute(parseCurrentRoute())
     }
 
-    window.addEventListener("popstate", handlePopState)
+    window.addEventListener("popstate", handleRouteChange)
+    window.addEventListener("hashchange", handleRouteChange)
 
-    return () => window.removeEventListener("popstate", handlePopState)
+    return () => {
+      window.removeEventListener("popstate", handleRouteChange)
+      window.removeEventListener("hashchange", handleRouteChange)
+    }
   }, [])
 
   return (
@@ -56,14 +72,12 @@ export default function App() {
                 status?.toLowerCase() === "generating" ||
                 status?.toLowerCase() === "failed"
               ) {
+                setFormData(null)
                 navigateTo(`/progress/${id}`)
                 return
               }
 
-              const savedTab = localStorage.getItem(`kit_${id}_tab`)
-
-              const slug = (savedTab && TAB_TO_SLUG[savedTab]) || "tu-vung"
-
+              const slug = getSavedTabSlug(id)
               navigateTo(`/kit/${id}?tab=${slug}`)
             }}
             onCreate={() => navigateTo("/create")}
@@ -84,10 +98,7 @@ export default function App() {
             kitId={route.kitId}
             formData={formData}
             onDone={() => {
-              const savedTab = localStorage.getItem(`kit_${route.kitId}_tab`)
-
-              const slug = (savedTab && TAB_TO_SLUG[savedTab]) || "tu-vung"
-
+              const slug = getSavedTabSlug(route.kitId)
               navigateTo(`/kit/${route.kitId}?tab=${slug}`, true)
             }}
           />
@@ -98,7 +109,7 @@ export default function App() {
             initialTab={route.tab}
             onBack={() => navigateTo("/")}
             onTabChange={(newTab) => {
-              const slug = TAB_TO_SLUG[newTab] || "tu-vung"
+              const slug = TAB_TO_SLUG[newTab] || DEFAULT_TAB_SLUG
 
               navigateTo(`/kit/${route.kitId}?tab=${slug}`, true)
             }}

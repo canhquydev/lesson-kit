@@ -16,10 +16,8 @@ import {
   ChevronDown,
   Clock,
   Refresh,
-  Search,
   Trash,
   AlertCircle,
-  AlertTriangle,
 } from "../components/icons"
 
 import { MathText } from "../components/MathText"
@@ -487,10 +485,9 @@ function ActivitiesTab({ data }: { data: Activity[] }) {
 
               {/* 2. Hướng dẫn chi tiết: EN primary + collapsible VI */}
               {(() => {
-                const instEn =
-                  a.instructions_en || (a as any).english_instructions
+                const instEn = a.instructions_en
 
-                const instVn = a.instructions_vn || (a as any).instructions
+                const instVn = a.instructions_vi
 
                 if (!instEn && !instVn) return null
 
@@ -1020,7 +1017,7 @@ function AssessmentsTab({ data }: { data: Assessment[] }) {
   const [openViIds, setOpenViIds] = useState<Record<string, boolean>>({})
 
   const hasAnyVi = data.some(
-    (a) => a.explanation_vn || (a as any).explanation_vi,
+    (a) => a.explanation_vi,
   )
 
   const allViOpen =
@@ -1070,9 +1067,9 @@ function AssessmentsTab({ data }: { data: Assessment[] }) {
             ? parseMatchingQuestion(a.question_text)
             : null
 
-        const explanationEn = a.explanation_en || a.explanation
+        const explanationEn = a.explanation_en
 
-        const explanationVn = a.explanation_vn || (a as any).explanation_vi
+        const explanationVn = a.explanation_vi
 
         return (
           <div
@@ -1345,7 +1342,7 @@ function ScriptTab({ data }: { data: TeachingScript[] }) {
 
         const isOpen = !!openIds[id]
 
-        const stepNum = s.step_order ?? s.step_number ?? i + 1
+        const stepNum = s.step_order ?? i + 1
 
         const stepTitle =
           s.activity_name ?? s.step_title ?? `Hoạt động ${stepNum}`
@@ -1494,9 +1491,9 @@ function VocabTab({ data }: { data: Vocabulary[] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((v) => (
+          {data.map((v, idx) => (
             <tr
-              key={v._id}
+              key={v._id || idx}
               className="border-b border-slate-100 align-top text-[13.5px] last:border-0 hover:bg-slate-50/50 transition-colors"
             >
               <td className="px-4 py-3.5 font-semibold text-slate-900 whitespace-nowrap">
@@ -1590,11 +1587,11 @@ export function Detail({
   const [tab, setTab] = useState(() => {
     if (initialTab && TABS.includes(initialTab)) return initialTab
 
-    const saved = localStorage.getItem(`kit_${kitId}_tab`)
-
-    if (saved === "Câu hỏi HS") return "Câu hỏi học sinh"
-
-    if (saved && TABS.includes(saved)) return saved
+    try {
+      const saved = localStorage.getItem(`kit_${kitId}_tab`)
+      if (saved === "Câu hỏi HS") return "Câu hỏi học sinh"
+      if (saved && TABS.includes(saved)) return saved
+    } catch {}
 
     return TABS[0]
   })
@@ -1635,20 +1632,15 @@ export function Detail({
   })
 
   const handleDismissStale = (tabName: string) => {
-    setDismissedTabs((prev) => {
-      if (prev.includes(tabName)) return prev
-
-      const next = [...prev, tabName]
-
-      try {
-        localStorage.setItem(
-          `kit_${kitId}_dismissed_stale`,
-          JSON.stringify(next),
-        )
-      } catch {}
-
-      return next
-    })
+    if (dismissedTabs.includes(tabName)) return
+    const next = [...dismissedTabs, tabName]
+    setDismissedTabs(next)
+    try {
+      localStorage.setItem(
+        `kit_${kitId}_dismissed_stale`,
+        JSON.stringify(next),
+      )
+    } catch {}
   }
 
   const staleTabs = useMemo(() => {
@@ -1672,34 +1664,45 @@ export function Detail({
     if (target && TABS.includes(target) && target !== tab) {
       setTab(target)
     }
-  }, [initialTab])
+  }, [initialTab, tab])
 
   const handleTabChange = (newTab: string) => {
     setTab(newTab)
 
-    localStorage.setItem(`kit_${kitId}_tab`, newTab)
+    try {
+      localStorage.setItem(`kit_${kitId}_tab`, newTab)
+    } catch {}
 
     onTabChange?.(newTab)
   }
 
   useEffect(() => {
+    let active = true
     setLoading(true)
 
-    getKitDetail(kitId)
+    async function fetchDetail() {
+      try {
+        const data = await getKitDetail(kitId)
+        if (!active) return
 
-      .then((data) => {
         if (data.status?.toLowerCase() === "generating") {
           navigateTo(`/progress/${kitId}`, true)
-
           return
         }
 
         setKit(data)
-      })
+      } catch {
+        if (active) toast("Không thể tải chi tiết kit", "error")
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
 
-      .catch(() => toast("Không thể tải chi tiết kit", "error"))
+    fetchDetail()
 
-      .finally(() => setLoading(false))
+    return () => {
+      active = false
+    }
   }, [kitId])
 
   async function handleRegenerate() {

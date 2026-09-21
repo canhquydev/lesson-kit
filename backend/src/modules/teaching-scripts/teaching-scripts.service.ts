@@ -14,6 +14,7 @@ import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { TeachingScriptItemDto } from './dto';
 import {
   buildTeachingScriptPrompt,
+  buildStepSkeleton,
   TeachingScriptPromptDependencies,
   TEACHING_SCRIPT_SYSTEM_PROMPT,
 } from './prompts';
@@ -74,9 +75,35 @@ export class TeachingScriptsService implements ComponentGenerator<
         }
 
         const response = raw as TeachingScriptResponse;
-        const items = Array.isArray(response.teaching_scripts)
+        const rawItems = Array.isArray(response.teaching_scripts)
           ? (response.teaching_scripts as unknown[])
           : [];
+
+        const items = rawItems.map((item, index) => {
+          if (!this.isRecord(item)) return item;
+          const sanitized = { ...item };
+          if (
+            typeof sanitized.step_order === 'string' &&
+            /^\d+$/.test(sanitized.step_order.trim())
+          ) {
+            sanitized.step_order = parseInt(sanitized.step_order.trim(), 10);
+          } else if (
+            sanitized.step_order === undefined ||
+            sanitized.step_order === null
+          ) {
+            sanitized.step_order = index + 1;
+          }
+          if (
+            typeof sanitized.duration_minutes === 'string' &&
+            /^\d+$/.test(sanitized.duration_minutes.trim())
+          ) {
+            sanitized.duration_minutes = parseInt(
+              sanitized.duration_minutes.trim(),
+              10,
+            );
+          }
+          return sanitized;
+        });
 
         return items;
       },
@@ -346,10 +373,16 @@ export class TeachingScriptsService implements ComponentGenerator<
       outputCountMap.set(key, (outputCountMap.get(key) ?? 0) + 1);
     }
 
-    // Build count map from Phase 1 activities
+    // Pre-computed skeleton determines expected activity steps and scaled durations
+    const skeleton = buildStepSkeleton(
+      context.duration,
+      dependencies.activities,
+    );
+    const expectedActivities = skeleton.filter((s) => s.role === 'activity');
+
+    // Build count map from expected skeleton activities
     const requiredCountMap = new Map<string, number>();
-    for (const activity of dependencies.activities) {
-      if (!this.isRecord(activity)) continue;
+    for (const activity of expectedActivities) {
       const name = activity.activity_name;
       const dur = activity.duration_minutes;
       if (typeof name !== 'string' || !name.trim() || typeof dur !== 'number') {

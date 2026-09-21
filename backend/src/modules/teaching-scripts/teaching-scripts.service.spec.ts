@@ -9,6 +9,7 @@ import { AiLogsService } from '../ai-logs/ai-logs.service';
 import { TeachingScriptItemDto } from './dto';
 import { TeachingScript } from './schemas/teaching-script.schema';
 import { TeachingScriptsService } from './teaching-scripts.service';
+import { buildStepSkeleton } from './prompts';
 
 describe('TeachingScriptsService', () => {
   let service: TeachingScriptsService;
@@ -508,6 +509,61 @@ describe('TeachingScriptsService', () => {
       expect(generateJson).toHaveBeenCalledTimes(2);
       const retryMsg = generateJson.mock.calls[1][0][1].content;
       expect(retryMsg).toContain('Missing Phase 1 activity "Test"');
+    });
+
+    it('preserves exact Phase 1 activity durations without scaling in teaching scripts', async () => {
+      const validContext = { ...context, duration: 40 };
+      const validActivities = [
+        { activity_name: 'Khám phá', duration_minutes: 8 },
+        { activity_name: 'Thiết kế', duration_minutes: 10 },
+        { activity_name: 'Thực hành', duration_minutes: 12 },
+      ];
+      const skeleton = buildStepSkeleton(
+        validContext.duration,
+        validActivities,
+      );
+      const scripts = skeleton.map((s) => ({
+        activity_name: s.activity_name,
+        duration_minutes: s.duration_minutes,
+        objective: 'Mục tiêu',
+        teacher_speech_en: 'Teacher speech in English',
+        teacher_speech_vi: 'Lời giảng tiếng Việt',
+        teacher_action: 'Action',
+        expected_student_response: 'Response',
+        notes: '',
+        step_order: s.step_order,
+      }));
+
+      generateJson.mockResolvedValueOnce({ teaching_scripts: scripts });
+
+      const result = await service.generate(validContext, {
+        ...dependencies,
+        activities: validActivities,
+      });
+
+      expect(result).toHaveLength(scripts.length);
+      // Assert exact durations are preserved
+      expect(result.find((r) => r.activity_name === 'Khám phá')?.duration_minutes).toBe(8);
+      expect(result.find((r) => r.activity_name === 'Thiết kế')?.duration_minutes).toBe(10);
+      expect(result.find((r) => r.activity_name === 'Thực hành')?.duration_minutes).toBe(12);
+      expect(generateJson).toHaveBeenCalledTimes(1);
+    });
+
+    it('pre-sanitizes numeric strings for step_order and duration_minutes from AI output', async () => {
+      const stringifiedScripts = validScripts.map((s) => ({
+        ...s,
+        step_order: String(s.step_order),
+        duration_minutes: String(s.duration_minutes),
+      }));
+
+      generateJson.mockResolvedValueOnce({
+        teaching_scripts: stringifiedScripts,
+      });
+
+      const result = await service.generate(context, dependencies);
+      expect(result).toHaveLength(validScripts.length);
+      expect(typeof result[0].step_order).toBe('number');
+      expect(typeof result[0].duration_minutes).toBe('number');
     });
 
     // Rejects generation without complete Phase 1 dependencies

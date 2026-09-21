@@ -73,7 +73,7 @@ export interface LessonKitListItem {
 
   support_level: string
 
-  status: string
+  status: "generating" | "completed" | "failed"
 
   current_step?: string
 
@@ -137,7 +137,7 @@ export interface Activity {
 
   instructions_en: string
 
-  instructions_vn: string
+  instructions_vi?: string
 
   student_task: string
 
@@ -150,8 +150,6 @@ export interface TeachingScript {
   _id: string
 
   step_order?: number
-
-  step_number?: number
 
   activity_name?: string
 
@@ -201,9 +199,7 @@ export interface Assessment {
 
   explanation_en?: string
 
-  explanation_vn?: string
-
-  explanation?: string
+  explanation_vi?: string
 
   sort_order: number
 }

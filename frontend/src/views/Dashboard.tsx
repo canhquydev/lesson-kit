@@ -32,13 +32,13 @@ const SUBJECT_DISPLAY: Record<string, string> = {
 const SUBJECT_OPTIONS = [
   { value: "ALL", label: "Tất cả" },
 
-  { value: "Vật lí", label: "Vật lí" },
+  { value: "VAT_LI", label: "Vật lí" },
 
-  { value: "Hóa học", label: "Hóa học" },
+  { value: "HOA_HOC", label: "Hóa học" },
 
-  { value: "Sinh học", label: "Sinh học" },
+  { value: "SINH_HOC", label: "Sinh học" },
 
-  { value: "Toán", label: "Toán" },
+  { value: "TOAN", label: "Toán" },
 ]
 
 const STATUS_OPTIONS = [
@@ -256,16 +256,31 @@ export function Dashboard({
 
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
-  const loadKits = useCallback(() => {
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const loadKits = useCallback(async () => {
     setLoading(true)
 
-    getKitList(1, 50)
-
-      .then(setKits)
-
-      .catch(() => toast("Không thể tải danh sách", "error"))
-
-      .finally(() => setLoading(false))
+    try {
+      const data = await getKitList(1, 50)
+      if (isMountedRef.current) {
+        setKits(data)
+      }
+    } catch {
+      if (isMountedRef.current) {
+        toast("Không thể tải danh sách", "error")
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -280,21 +295,22 @@ export function Dashboard({
     if (!deleteTargetId) return
 
     const id = deleteTargetId
-
     setDeleteTargetId(null)
 
-    // Optimistic delete
-
+    // Optimistic delete with functional rollback
+    const targetKit = kits.find((k) => k._id === id)
     setKits((prev) => prev.filter((k) => k._id !== id))
 
     try {
       await deleteKit(id)
-
       toast("Đã xóa Lesson Kit", "success")
     } catch {
       toast("Xóa thất bại", "error")
-
-      loadKits() // rollback
+      if (targetKit) {
+        setKits((prev) =>
+          prev.some((k) => k._id === id) ? prev : [...prev, targetKit],
+        )
+      }
     }
   }
 
@@ -305,9 +321,7 @@ export function Dashboard({
           !q.trim() ||
           k.lesson_topic.toLowerCase().includes(q.toLowerCase().trim())
 
-        const mappedSubject = SUBJECT_DISPLAY[k.subject] || k.subject
-
-        const matchSubject = subject === "ALL" || mappedSubject === subject
+        const matchSubject = subject === "ALL" || k.subject === subject
 
         const matchStatus =
           status === "ALL" || k.status.toLowerCase() === status.toLowerCase()

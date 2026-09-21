@@ -182,6 +182,19 @@ describe('ActivitiesService', () => {
       );
     });
 
+    it('should fail validation if total duration exceeds context.duration minus 8 minutes', () => {
+      const longActivities = [
+        { ...sampleValidActivities[0], duration_minutes: 20 },
+        { ...sampleValidActivities[1], duration_minutes: 20 },
+      ];
+      // total = 40 min, mockContext.duration = 45 min -> max allowed = 37 min. 40 > 37.
+      const result = service.validate(longActivities, mockContext);
+      expect(result.isValid).toBe(false);
+      expect(
+        result.errors.some((e) => e.includes('exceeds the maximum allowed')),
+      ).toBe(true);
+    });
+
     it('should fail validation if instructions_vn has fewer than 2 steps', () => {
       const invalidActivities = [
         sampleValidActivities[0],

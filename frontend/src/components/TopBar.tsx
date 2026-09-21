@@ -12,7 +12,7 @@ export function TopBar({
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-[1240px] items-center gap-4 px-6">
-        <button onClick={onHome} className="flex shrink-0 items-center gap-2.5">
+        <button type="button" onClick={onHome} className="flex shrink-0 items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-indigo-600 text-white shadow-sm shadow-indigo-600/30">
             <Sparkle width={17} height={17} />
           </span>
@@ -34,12 +34,13 @@ export function TopBar({
         </div>
 
         <div className="ml-auto flex items-center gap-2.5">
-          <button className="relative flex h-9 w-9 items-center justify-center rounded-[10px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700">
+          <button type="button" aria-label="Thông báo" className="relative flex h-9 w-9 items-center justify-center rounded-[10px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700">
             <Bell width={18} height={18} />
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-rose-500" />
           </button>
 
           <button
+            type="button"
             onClick={onCreate}
             className="flex items-center gap-1.5 rounded-[10px] bg-indigo-600 px-3.5 py-2 text-[13.5px] font-semibold text-white shadow-sm shadow-indigo-600/25 transition-colors hover:bg-indigo-500"
           >
@@ -47,7 +48,7 @@ export function TopBar({
             <span className="hidden sm:inline">Tạo Lesson Kit</span>
           </button>
 
-          <button className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-[13px] font-semibold text-white ring-2 ring-white">
+          <button type="button" aria-label="Tài khoản" className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-[13px] font-semibold text-white ring-2 ring-white">
             MT
           </button>
         </div>

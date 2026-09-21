@@ -61,13 +61,20 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
           },
         ]);
 
-        return (response.activities || []).map((item) => ({
-          ...item,
-          activity_type: this.normalizeActivityType(item?.activity_type),
-          group_type: this.normalizeGroupType(item?.group_type),
-        }));
+        return (response.activities || []).map((item) => {
+          let dur = item?.duration_minutes;
+          if (typeof dur === 'string' && /^\d+$/.test(dur.trim())) {
+            dur = parseInt(dur.trim(), 10);
+          }
+          return {
+            ...item,
+            duration_minutes: dur,
+            activity_type: this.normalizeActivityType(item?.activity_type),
+            group_type: this.normalizeGroupType(item?.group_type),
+          };
+        });
       },
-      (data: any[]) => this.validate(data),
+      (data: any[]) => this.validate(data, context),
       3,
       (attempt, errors, rawData) => {
         this.aiLogsService.logError({
@@ -98,9 +105,10 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
    * - activity_type phải thuộc 10 hình thức cho phép.
    * - group_type phải thuộc 4 kiểu: individual, pair, group, whole_class.
    * - duration_minutes phải > 0.
+   * - Tổng duration_minutes không được vượt quá context.duration - 8.
    * - Bắt buộc đầy đủ các trường: activity_name, description, objective, instructions_en, instructions_vn, student_task, expected_outcome.
    */
-  validate(data: any[]): ValidationResult {
+  validate(data: any[], context?: GenerationContext): ValidationResult {
     const errors: string[] = [];
 
     if (!Array.isArray(data)) {
@@ -118,6 +126,32 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
       );
     }
 
+    // Kiểm tra tổng thời lượng activities không được vượt quá thời lượng tiết học
+    // Cần chừa tối thiểu 8 phút cho warm-up, assessment và wrap-up
+    if (
+      context?.duration &&
+      typeof context.duration === 'number' &&
+      context.duration > 0
+    ) {
+      const maxAllowedMinutes = Math.max(1, context.duration - 8);
+      const totalDuration = data.reduce((sum, item) => {
+        let dur = item?.duration_minutes;
+        if (typeof dur === 'string' && /^\d+$/.test(dur.trim())) {
+          dur = parseInt(dur.trim(), 10);
+        }
+        return (
+          sum +
+          (typeof dur === 'number' && !isNaN(dur) && dur > 0 ? dur : 0)
+        );
+      }, 0);
+
+      if (totalDuration > maxAllowedMinutes) {
+        errors.push(
+          `Total duration of activities (${totalDuration} minutes) exceeds the maximum allowed (${maxAllowedMinutes} minutes) for a ${context.duration}-minute lesson. Activities must leave at least 8 minutes for warm-up, assessment, and wrap-up.`,
+        );
+      }
+    }
+
     const validActivityTypes = new Set(Object.values(ActivityType));
     const validGroupTypes = new Set(Object.values(GroupType));
 
@@ -133,6 +167,12 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
       }
 
       if (item && typeof item === 'object') {
+        if (
+          typeof item.duration_minutes === 'string' &&
+          /^\d+$/.test(item.duration_minutes.trim())
+        ) {
+          item.duration_minutes = parseInt(item.duration_minutes.trim(), 10);
+        }
         if (item.activity_type) {
           item.activity_type = this.normalizeActivityType(item.activity_type);
         }
