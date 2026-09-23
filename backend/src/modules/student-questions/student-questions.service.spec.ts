@@ -199,7 +199,9 @@ describe('StudentQuestionsService', () => {
         ...q,
         extra_field: 'should be tolerated',
       }));
-      generateJson.mockResolvedValueOnce({ student_questions: withExtraFields });
+      generateJson.mockResolvedValueOnce({
+        student_questions: withExtraFields,
+      });
 
       await service.generate(context, dependencies);
       expect(generateJson).toHaveBeenCalledTimes(1);

@@ -80,15 +80,15 @@ export class LessonKitsController {
   ): Observable<MessageEvent> {
     const initial$ = defer(async () => {
       const current = await this.lessonKitsService.getStatus(id);
-      return { data: current } as MessageEvent;
+      return { data: current };
     });
 
     const event$ = fromEvent(this.eventEmitter, `kit.${id}.progress`).pipe(
-      map((payload) => ({ data: payload } as MessageEvent)),
+      map((payload) => ({ data: payload }) as MessageEvent),
     );
 
     const heartbeat$ = interval(HEARTBEAT_INTERVAL_MS).pipe(
-      map(() => ({ data: { type: 'heartbeat' } } as MessageEvent)),
+      map(() => ({ data: { type: 'heartbeat' } })),
     );
 
     return merge(initial$, event$, heartbeat$);
@@ -116,10 +116,10 @@ export class LessonKitsController {
   @Post(':id/regenerate/:component')
   async regenerate(
     @Param('id', ParseMongoIdPipe) id: string,
-    @Param('component', new ParseEnumPipe(ComponentType)) component: ComponentType,
+    @Param('component', new ParseEnumPipe(ComponentType))
+    component: ComponentType,
   ) {
     const result = await this.regenerateService.regenerate(id, component);
     return BaseResponseDto.ok(result, `Đã tạo lại ${component}`);
   }
 }
-

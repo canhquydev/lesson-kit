@@ -16,4 +16,3 @@ export class LessonContentsController {
     return BaseResponseDto.ok(data, 'Danh sách bài học');
   }
 }
-

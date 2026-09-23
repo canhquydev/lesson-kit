@@ -28,12 +28,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
         const res = exceptionResponse as Record<string, unknown>;
-        const rawMessage = res.message || exception.message;
-        message = Array.isArray(rawMessage)
-          ? rawMessage.join('; ')
-          : String(rawMessage);
+        const rawMessage = res.message ?? exception.message;
+        if (Array.isArray(rawMessage)) {
+          message = rawMessage.join('; ');
+        } else if (typeof rawMessage === 'string') {
+          message = rawMessage;
+        } else if (typeof rawMessage === 'object' && rawMessage !== null) {
+          message = JSON.stringify(rawMessage);
+        } else {
+          message = String(rawMessage ?? '');
+        }
         error = res.error;
       }
     }
@@ -43,7 +52,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       logMessage = exception.message;
     } else if (typeof exception === 'string') {
       logMessage = exception;
-    } else if (typeof exception === 'object' && exception !== null && !(exception instanceof HttpException)) {
+    } else if (
+      typeof exception === 'object' &&
+      exception !== null &&
+      !(exception instanceof HttpException)
+    ) {
       try {
         logMessage = JSON.stringify(exception);
       } catch {
@@ -55,6 +68,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exception instanceof Error ? exception.stack : undefined,
     );
 
-    response.status(status).json(BaseResponseDto.fail(message, error as string | Record<string, unknown>));
+    response
+      .status(status)
+      .json(
+        BaseResponseDto.fail(
+          message,
+          error as string | Record<string, unknown>,
+        ),
+      );
   }
 }

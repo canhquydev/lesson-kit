@@ -143,7 +143,11 @@ export class LessonKitsService {
 
   async updateCurrentStep(id: string, step: string): Promise<void> {
     const result = await this.lessonKitModel
-      .findByIdAndUpdate(id, { current_step: step }, { returnDocument: 'after' })
+      .findByIdAndUpdate(
+        id,
+        { current_step: step },
+        { returnDocument: 'after' },
+      )
       .exec();
     if (!result) {
       throw new NotFoundException(`Lesson Kit with ID "${id}" not found`);
@@ -270,11 +274,13 @@ export class LessonKitsService {
    * Tiếp tục/thử lại quá trình tạo cho Lesson Kit bị thất bại
    */
   async retry(id: string): Promise<{ lesson_kit_id: string; status: string }> {
-    const kit = await this.lessonKitModel.findOneAndUpdate(
-      { _id: id, status: { $ne: LessonKitStatus.GENERATING } },
-      { status: LessonKitStatus.GENERATING },
-      { returnDocument: 'after' },
-    ).exec();
+    const kit = await this.lessonKitModel
+      .findOneAndUpdate(
+        { _id: id, status: { $ne: LessonKitStatus.GENERATING } },
+        { status: LessonKitStatus.GENERATING },
+        { returnDocument: 'after' },
+      )
+      .exec();
 
     if (!kit) {
       const exists = await this.lessonKitModel.exists({ _id: id });

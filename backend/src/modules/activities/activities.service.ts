@@ -140,8 +140,7 @@ export class ActivitiesService implements ComponentGenerator<ActivityDocument> {
           dur = parseInt(dur.trim(), 10);
         }
         return (
-          sum +
-          (typeof dur === 'number' && !isNaN(dur) && dur > 0 ? dur : 0)
+          sum + (typeof dur === 'number' && !isNaN(dur) && dur > 0 ? dur : 0)
         );
       }, 0);
 
@@ -378,7 +377,11 @@ ${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
     if (lower === 'matching') {
       return ActivityType.MATCHING;
     }
-    if (lower === 'role play' || lower === 'role-play' || lower === 'roleplay') {
+    if (
+      lower === 'role play' ||
+      lower === 'role-play' ||
+      lower === 'roleplay'
+    ) {
       return ActivityType.ROLE_PLAY;
     }
     if (lower === 'quiz') {
@@ -431,7 +434,10 @@ ${retryErrList.map((err, i) => `${i + 1}. ${err}`).join('\n')}
    */
   private normalizeGroupType(type: any): string {
     if (!type || typeof type !== 'string') return type;
-    const lower = type.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    const lower = type
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
 
     if (lower === 'individual' || lower === 'cá_nhân') {
       return GroupType.INDIVIDUAL;

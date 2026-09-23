@@ -9,4 +9,3 @@ export interface GenerationContext {
   readonly duration: number;
   readonly supportLevel: SupportLevel;
 }
-

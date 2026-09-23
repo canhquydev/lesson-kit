@@ -156,7 +156,10 @@ describe('LessonKitsController', () => {
       };
       mockRegenerateService.regenerate.mockResolvedValue(mockResult);
 
-      const response = await controller.regenerate('kit_123', ComponentType.VOCABULARY);
+      const response = await controller.regenerate(
+        'kit_123',
+        ComponentType.VOCABULARY,
+      );
 
       expect(mockRegenerateService.regenerate).toHaveBeenCalledWith(
         'kit_123',

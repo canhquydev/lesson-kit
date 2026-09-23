@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { LessonKitStatus, SupportLevel } from '../../common/enums';
+import { LessonKitStatus } from '../../common/enums';
 import { GenerationContext } from '../../common/interfaces';
 import { ActivitiesService } from '../activities/activities.service';
 import { AssessmentsService } from '../assessments/assessments.service';
@@ -57,7 +57,7 @@ export class GenerationService {
     private readonly teachingScriptsService: TeachingScriptsService,
     private readonly studentQuestionsService: StudentQuestionsService,
     private readonly assessmentsService: AssessmentsService,
-  ) { }
+  ) {}
 
   @OnEvent('lesson-kit.generate')
   async handleLessonKitGenerate(payload: {
@@ -78,315 +78,48 @@ export class GenerationService {
       );
     }
   }
-
   async generateLessonKit(lessonKitId: string): Promise<void> {
     const startTime = Date.now();
     let currentStep = 'phase1';
 
     try {
-      // 1. Load Lesson Kit
-      const kit = await this.lessonKitsService.findById(lessonKitId);
-      if (!kit) {
-        throw new NotFoundException(
-          `Lesson Kit with ID "${lessonKitId}" not found`,
-        );
-      }
-      if (kit.status !== LessonKitStatus.GENERATING) {
-        this.logger.warn(
-          `[Kit: ${lessonKitId}] Ignored generation event because status is "${kit.status}"`,
-        );
+      // 1. Load context
+      const context = await this.prepareGenerationContext(lessonKitId);
+      if (!context) {
         return;
       }
 
-      // 2. Load Lesson Content
-      const lessonContentId = kit.lesson_content_id.toString();
-      const lessonContent =
-        await this.lessonContentsService.findById(lessonContentId);
-      if (!lessonContent) {
-        throw new NotFoundException(
-          `Lesson content with ID "${lessonContentId}" not found`,
-        );
-      }
-
-      // 3. Build GenerationContext
-      const context: GenerationContext = {
-        lessonContentId: lessonContent._id.toHexString(),
-        subject: kit.subject || lessonContent.subject,
-        grade: kit.grade || lessonContent.grade,
-        title: kit.lesson_topic || lessonContent.title,
-        content: lessonContent.content,
-        duration: kit.duration,
-        supportLevel: kit.support_level as SupportLevel,
-      };
-
-      // -----------------------------------------------------------------------
-      // -----------------------------------------------------------------------
-      // Phase 1: Run in parallel (vocabularies, expressions, activities)
-      // Check existing components in DB to resume from checkpoint if retrying
-      // -----------------------------------------------------------------------
-      let [vocab, expressions, activities]: [
-        Vocabulary[],
-        ClassroomExpression[],
-        Activity[],
-      ] = await Promise.all([
-        typeof this.vocabulariesService?.findByKitId === 'function'
-          ? this.vocabulariesService.findByKitId(lessonKitId)
-          : Promise.resolve([]),
-        typeof this.classroomExpressionsService?.findByKitId === 'function'
-          ? this.classroomExpressionsService.findByKitId(lessonKitId)
-          : Promise.resolve([]),
-        typeof this.activitiesService?.findByKitId === 'function'
-          ? this.activitiesService.findByKitId(lessonKitId)
-          : Promise.resolve([]),
-      ]);
-
-      const needVocab = !vocab || vocab.length === 0;
-      const needExpressions = !expressions || expressions.length === 0;
-      const needActivities = !activities || activities.length === 0;
-
-      if (needVocab || needExpressions || needActivities) {
-        currentStep = 'phase1';
-        await this.lessonKitsService.updateCurrentStep(lessonKitId, currentStep);
-
-        this.logger.log(
-          `[Kit: ${lessonKitId}] Phase 1 started (need: ${[
-            needVocab ? 'vocabularies' : null,
-            needExpressions ? 'expressions' : null,
-            needActivities ? 'activities' : null,
-          ]
-            .filter(Boolean)
-            .join(', ')})`,
-        );
-
-        const [genVocab, genExpressions, genActivities] = await Promise.all([
-          needVocab
-            ? this.runStep('phase1_vocabulary', () =>
-              this.vocabulariesService.generate(context),
-            )
-            : Promise.resolve(vocab),
-          needExpressions
-            ? this.runStep('phase1_expressions', () =>
-              this.classroomExpressionsService.generate(context),
-            )
-            : Promise.resolve(expressions),
-          needActivities
-            ? this.runStep('phase1_activities', () =>
-              this.activitiesService.generate(context),
-            )
-            : Promise.resolve(activities),
-        ]);
-
-        vocab = genVocab;
-        expressions = genExpressions;
-        activities = genActivities;
-
-        const markPhase1Complete = this.createOrderedProgressTracker(
-          lessonKitId,
-          ['phase1_vocabulary', 'phase1_expressions', 'phase1_activities'],
-        );
-
-        const saveTasks: Promise<unknown>[] = [];
-
-        if (needVocab) {
-          saveTasks.push(
-            this.runStep('phase1_vocabulary', () =>
-              this.saveAndTrack(
-                () => this.vocabulariesService.saveBulk(lessonKitId, vocab),
-                () => markPhase1Complete('phase1_vocabulary'),
-              ),
-            ),
-          );
-        } else {
-          markPhase1Complete('phase1_vocabulary');
-        }
-
-        if (needExpressions) {
-          saveTasks.push(
-            this.runStep('phase1_expressions', () =>
-              this.saveAndTrack(
-                () =>
-                  this.classroomExpressionsService.saveBulk(
-                    lessonKitId,
-                    expressions,
-                  ),
-                () => markPhase1Complete('phase1_expressions'),
-              ),
-            ),
-          );
-        } else {
-          markPhase1Complete('phase1_expressions');
-        }
-
-        if (needActivities) {
-          saveTasks.push(
-            this.runStep('phase1_activities', () =>
-              this.saveAndTrack(
-                () => this.activitiesService.saveBulk(lessonKitId, activities),
-                () => markPhase1Complete('phase1_activities'),
-              ),
-            ),
-          );
-        } else {
-          markPhase1Complete('phase1_activities');
-        }
-
-        await this.waitForParallelTasks(saveTasks);
-      } else {
-        this.logger.log(
-          `[Kit: ${lessonKitId}] Phase 1 components already exist in DB, resuming...`,
-        );
-      }
+      // 2. Phase 1: Vocabularies, Expressions, Activities (Parallel)
+      currentStep = 'phase1';
+      const phase1Result = await this.executePhase1(lessonKitId, context);
 
       if (!(await this.isStillGenerating(lessonKitId))) {
         return;
       }
 
-      // -----------------------------------------------------------------------
-      // Phase 2: Teaching Scripts (depends on Phase 1)
-      // -----------------------------------------------------------------------
-      let scripts: TeachingScript[] =
-        typeof this.teachingScriptsService?.findByKitId === 'function'
-          ? await this.teachingScriptsService.findByKitId(lessonKitId)
-          : [];
-      const needScripts = !scripts || scripts.length === 0;
-
-      if (needScripts) {
-        currentStep = 'phase2_script';
-        await this.lessonKitsService.updateCurrentStep(lessonKitId, currentStep);
-        this.logger.log(
-          `[Kit: ${lessonKitId}] Phase 2 started (teaching scripts)`,
-        );
-
-        scripts = await this.runStep(currentStep, () =>
-          this.teachingScriptsService.generate(context, {
-            vocabularies: vocab,
-            expressions,
-            activities,
-          }),
-        );
-
-        await this.runStep(currentStep, () =>
-          this.teachingScriptsService.saveBulk(lessonKitId, scripts),
-        );
-      } else {
-        this.logger.log(
-          `[Kit: ${lessonKitId}] Phase 2 (teaching scripts) already exists in DB, resuming...`,
-        );
-      }
-
-      if (!(await this.isStillGenerating(lessonKitId))) {
-        return;
-      }
-
-      // -----------------------------------------------------------------------
-      // Phase 3: Run in parallel (student questions, assessments)
-      // -----------------------------------------------------------------------
-      let [questions, assessments]: [StudentQuestion[], Assessment[]] =
-        await Promise.all([
-          typeof this.studentQuestionsService?.findByKitId === 'function'
-            ? this.studentQuestionsService.findByKitId(lessonKitId)
-            : Promise.resolve([]),
-          typeof this.assessmentsService?.findByKitId === 'function'
-            ? this.assessmentsService.findByKitId(lessonKitId)
-            : Promise.resolve([]),
-        ]);
-
-      const needQuestions = !questions || questions.length === 0;
-      const needAssessments = !assessments || assessments.length === 0;
-
-      if (needQuestions || needAssessments) {
-        currentStep = 'phase3';
-        await this.lessonKitsService.updateCurrentStep(lessonKitId, 'phase3');
-        this.logger.log(
-          `[Kit: ${lessonKitId}] Phase 3 started (need: ${[
-            needQuestions ? 'questions' : null,
-            needAssessments ? 'assessments' : null,
-          ]
-            .filter(Boolean)
-            .join(', ')})`,
-        );
-
-        const [genQuestions, genAssessments] = await Promise.all([
-          needQuestions
-            ? this.runStep('phase3_questions', () =>
-              this.studentQuestionsService.generate(context, {
-                teachingScripts: scripts,
-                activities,
-              }),
-            )
-            : Promise.resolve(questions),
-          needAssessments
-            ? this.runStep('phase3_assessment', () =>
-              this.assessmentsService.generate(context, {
-                teachingScripts: scripts,
-                activities,
-              }),
-            )
-            : Promise.resolve(assessments),
-        ]);
-
-        questions = genQuestions;
-        assessments = genAssessments;
-
-        const markPhase3Complete = this.createOrderedProgressTracker(
-          lessonKitId,
-          ['phase3_questions', 'phase3_assessment'],
-        );
-
-        const savePhase3Tasks: Promise<unknown>[] = [];
-
-        if (needQuestions) {
-          savePhase3Tasks.push(
-            this.runStep('phase3_questions', () =>
-              this.saveAndTrack(
-                () =>
-                  this.studentQuestionsService.saveBulk(
-                    lessonKitId,
-                    questions,
-                  ),
-                () => markPhase3Complete('phase3_questions'),
-              ),
-            ),
-          );
-        } else {
-          markPhase3Complete('phase3_questions');
-        }
-
-        if (needAssessments) {
-          savePhase3Tasks.push(
-            this.runStep('phase3_assessment', () =>
-              this.saveAndTrack(
-                () =>
-                  this.assessmentsService.saveBulk(lessonKitId, assessments),
-                () => markPhase3Complete('phase3_assessment'),
-              ),
-            ),
-          );
-        } else {
-          markPhase3Complete('phase3_assessment');
-        }
-
-        await this.waitForParallelTasks(savePhase3Tasks);
-      } else {
-        this.logger.log(
-          `[Kit: ${lessonKitId}] Phase 3 components already exist in DB, resuming...`,
-        );
-      }
-
-      // -----------------------------------------------------------------------
-      // Completed
-      // -----------------------------------------------------------------------
-      const generationTimeMs = Date.now() - startTime;
-      await this.lessonKitsService.updateCurrentStep(lessonKitId, 'completed');
-      await this.lessonKitsService.updateStatus(
+      // 3. Phase 2: Teaching Scripts (depends on Phase 1)
+      currentStep = 'phase2_script';
+      const scripts = await this.executePhase2(
         lessonKitId,
-        LessonKitStatus.COMPLETED,
-        generationTimeMs,
+        context,
+        phase1Result,
       );
 
-      this.logger.log(
-        `[Kit: ${lessonKitId}] Pipeline completed in ${generationTimeMs}ms`,
+      if (!(await this.isStillGenerating(lessonKitId))) {
+        return;
+      }
+
+      // 4. Phase 3: Student Questions & Assessments (Parallel, depends on Phase 1 & 2)
+      currentStep = 'phase3';
+      await this.executePhase3(
+        lessonKitId,
+        context,
+        phase1Result.activities,
+        scripts,
       );
+
+      // 5. Mark completed
+      await this.completeGeneration(lessonKitId, startTime);
     } catch (error: unknown) {
       const failedStep =
         error instanceof PipelineStepError ? error.step : currentStep;
@@ -421,6 +154,323 @@ export class GenerationService {
 
       throw originalError;
     }
+  }
+
+  private async prepareGenerationContext(
+    lessonKitId: string,
+  ): Promise<GenerationContext | null> {
+    const kit = await this.lessonKitsService.findById(lessonKitId);
+    if (!kit) {
+      throw new NotFoundException(
+        `Lesson Kit with ID "${lessonKitId}" not found`,
+      );
+    }
+    if (kit.status !== LessonKitStatus.GENERATING) {
+      this.logger.warn(
+        `[Kit: ${lessonKitId}] Ignored generation event because status is "${kit.status}"`,
+      );
+      return null;
+    }
+
+    const lessonContentId = kit.lesson_content_id.toString();
+    const lessonContent =
+      await this.lessonContentsService.findById(lessonContentId);
+    if (!lessonContent) {
+      throw new NotFoundException(
+        `Lesson content with ID "${lessonContentId}" not found`,
+      );
+    }
+
+    return {
+      lessonContentId: lessonContent._id.toHexString(),
+      subject: kit.subject || lessonContent.subject,
+      grade: kit.grade || lessonContent.grade,
+      title: kit.lesson_topic || lessonContent.title,
+      content: lessonContent.content,
+      duration: kit.duration,
+      supportLevel: kit.support_level,
+    };
+  }
+
+  private async executePhase1(
+    lessonKitId: string,
+    context: GenerationContext,
+  ): Promise<{
+    vocab: Vocabulary[];
+    expressions: ClassroomExpression[];
+    activities: Activity[];
+  }> {
+    let [vocab, expressions, activities]: [
+      Vocabulary[],
+      ClassroomExpression[],
+      Activity[],
+    ] = await Promise.all([
+      typeof this.vocabulariesService?.findByKitId === 'function'
+        ? this.vocabulariesService.findByKitId(lessonKitId)
+        : Promise.resolve([]),
+      typeof this.classroomExpressionsService?.findByKitId === 'function'
+        ? this.classroomExpressionsService.findByKitId(lessonKitId)
+        : Promise.resolve([]),
+      typeof this.activitiesService?.findByKitId === 'function'
+        ? this.activitiesService.findByKitId(lessonKitId)
+        : Promise.resolve([]),
+    ]);
+
+    const needVocab = !vocab || vocab.length === 0;
+    const needExpressions = !expressions || expressions.length === 0;
+    const needActivities = !activities || activities.length === 0;
+
+    if (needVocab || needExpressions || needActivities) {
+      await this.lessonKitsService.updateCurrentStep(lessonKitId, 'phase1');
+
+      this.logger.log(
+        `[Kit: ${lessonKitId}] Phase 1 started (need: ${[
+          needVocab ? 'vocabularies' : null,
+          needExpressions ? 'expressions' : null,
+          needActivities ? 'activities' : null,
+        ]
+          .filter(Boolean)
+          .join(', ')})`,
+      );
+
+      const [genVocab, genExpressions, genActivities] = await Promise.all([
+        needVocab
+          ? this.runStep('phase1_vocabulary', () =>
+              this.vocabulariesService.generate(context),
+            )
+          : Promise.resolve(vocab),
+        needExpressions
+          ? this.runStep('phase1_expressions', () =>
+              this.classroomExpressionsService.generate(context),
+            )
+          : Promise.resolve(expressions),
+        needActivities
+          ? this.runStep('phase1_activities', () =>
+              this.activitiesService.generate(context),
+            )
+          : Promise.resolve(activities),
+      ]);
+
+      vocab = genVocab;
+      expressions = genExpressions;
+      activities = genActivities;
+
+      const markPhase1Complete = this.createOrderedProgressTracker(
+        lessonKitId,
+        ['phase1_vocabulary', 'phase1_expressions', 'phase1_activities'],
+      );
+
+      const saveTasks: Promise<unknown>[] = [];
+
+      if (needVocab) {
+        saveTasks.push(
+          this.runStep('phase1_vocabulary', () =>
+            this.saveAndTrack(
+              () => this.vocabulariesService.saveBulk(lessonKitId, vocab),
+              () => markPhase1Complete('phase1_vocabulary'),
+            ),
+          ),
+        );
+      } else {
+        await markPhase1Complete('phase1_vocabulary');
+      }
+
+      if (needExpressions) {
+        saveTasks.push(
+          this.runStep('phase1_expressions', () =>
+            this.saveAndTrack(
+              () =>
+                this.classroomExpressionsService.saveBulk(
+                  lessonKitId,
+                  expressions,
+                ),
+              () => markPhase1Complete('phase1_expressions'),
+            ),
+          ),
+        );
+      } else {
+        await markPhase1Complete('phase1_expressions');
+      }
+
+      if (needActivities) {
+        saveTasks.push(
+          this.runStep('phase1_activities', () =>
+            this.saveAndTrack(
+              () => this.activitiesService.saveBulk(lessonKitId, activities),
+              () => markPhase1Complete('phase1_activities'),
+            ),
+          ),
+        );
+      } else {
+        await markPhase1Complete('phase1_activities');
+      }
+
+      await this.waitForParallelTasks(saveTasks);
+    } else {
+      this.logger.log(
+        `[Kit: ${lessonKitId}] Phase 1 components already exist in DB, resuming...`,
+      );
+    }
+
+    return { vocab, expressions, activities };
+  }
+
+  private async executePhase2(
+    lessonKitId: string,
+    context: GenerationContext,
+    phase1: {
+      vocab: Vocabulary[];
+      expressions: ClassroomExpression[];
+      activities: Activity[];
+    },
+  ): Promise<TeachingScript[]> {
+    let scripts: TeachingScript[] =
+      typeof this.teachingScriptsService?.findByKitId === 'function'
+        ? await this.teachingScriptsService.findByKitId(lessonKitId)
+        : [];
+    const needScripts = !scripts || scripts.length === 0;
+
+    if (needScripts) {
+      const currentStep = 'phase2_script';
+      await this.lessonKitsService.updateCurrentStep(lessonKitId, currentStep);
+      this.logger.log(
+        `[Kit: ${lessonKitId}] Phase 2 started (teaching scripts)`,
+      );
+
+      scripts = await this.runStep(currentStep, () =>
+        this.teachingScriptsService.generate(context, {
+          vocabularies: phase1.vocab,
+          expressions: phase1.expressions,
+          activities: phase1.activities,
+        }),
+      );
+
+      await this.runStep(currentStep, () =>
+        this.teachingScriptsService.saveBulk(lessonKitId, scripts),
+      );
+    } else {
+      this.logger.log(
+        `[Kit: ${lessonKitId}] Phase 2 (teaching scripts) already exists in DB, resuming...`,
+      );
+    }
+
+    return scripts;
+  }
+
+  private async executePhase3(
+    lessonKitId: string,
+    context: GenerationContext,
+    activities: Activity[],
+    scripts: TeachingScript[],
+  ): Promise<{
+    questions: StudentQuestion[];
+    assessments: Assessment[];
+  }> {
+    let [questions, assessments]: [StudentQuestion[], Assessment[]] =
+      await Promise.all([
+        typeof this.studentQuestionsService?.findByKitId === 'function'
+          ? this.studentQuestionsService.findByKitId(lessonKitId)
+          : Promise.resolve([]),
+        typeof this.assessmentsService?.findByKitId === 'function'
+          ? this.assessmentsService.findByKitId(lessonKitId)
+          : Promise.resolve([]),
+      ]);
+
+    const needQuestions = !questions || questions.length === 0;
+    const needAssessments = !assessments || assessments.length === 0;
+
+    if (needQuestions || needAssessments) {
+      await this.lessonKitsService.updateCurrentStep(lessonKitId, 'phase3');
+      this.logger.log(
+        `[Kit: ${lessonKitId}] Phase 3 started (need: ${[
+          needQuestions ? 'questions' : null,
+          needAssessments ? 'assessments' : null,
+        ]
+          .filter(Boolean)
+          .join(', ')})`,
+      );
+
+      const [genQuestions, genAssessments] = await Promise.all([
+        needQuestions
+          ? this.runStep('phase3_questions', () =>
+              this.studentQuestionsService.generate(context, {
+                teachingScripts: scripts,
+                activities,
+              }),
+            )
+          : Promise.resolve(questions),
+        needAssessments
+          ? this.runStep('phase3_assessment', () =>
+              this.assessmentsService.generate(context, {
+                teachingScripts: scripts,
+                activities,
+              }),
+            )
+          : Promise.resolve(assessments),
+      ]);
+
+      questions = genQuestions;
+      assessments = genAssessments;
+
+      const markPhase3Complete = this.createOrderedProgressTracker(
+        lessonKitId,
+        ['phase3_questions', 'phase3_assessment'],
+      );
+
+      const savePhase3Tasks: Promise<unknown>[] = [];
+
+      if (needQuestions) {
+        savePhase3Tasks.push(
+          this.runStep('phase3_questions', () =>
+            this.saveAndTrack(
+              () =>
+                this.studentQuestionsService.saveBulk(lessonKitId, questions),
+              () => markPhase3Complete('phase3_questions'),
+            ),
+          ),
+        );
+      } else {
+        await markPhase3Complete('phase3_questions');
+      }
+
+      if (needAssessments) {
+        savePhase3Tasks.push(
+          this.runStep('phase3_assessment', () =>
+            this.saveAndTrack(
+              () => this.assessmentsService.saveBulk(lessonKitId, assessments),
+              () => markPhase3Complete('phase3_assessment'),
+            ),
+          ),
+        );
+      } else {
+        await markPhase3Complete('phase3_assessment');
+      }
+
+      await this.waitForParallelTasks(savePhase3Tasks);
+    } else {
+      this.logger.log(
+        `[Kit: ${lessonKitId}] Phase 3 components already exist in DB, resuming...`,
+      );
+    }
+
+    return { questions, assessments };
+  }
+
+  private async completeGeneration(
+    lessonKitId: string,
+    startTime: number,
+  ): Promise<void> {
+    const generationTimeMs = Date.now() - startTime;
+    await this.lessonKitsService.updateCurrentStep(lessonKitId, 'completed');
+    await this.lessonKitsService.updateStatus(
+      lessonKitId,
+      LessonKitStatus.COMPLETED,
+      generationTimeMs,
+    );
+
+    this.logger.log(
+      `[Kit: ${lessonKitId}] Pipeline completed in ${generationTimeMs}ms`,
+    );
   }
 
   private async runStep<T>(step: string, task: () => Promise<T>): Promise<T> {

@@ -11,4 +11,3 @@ export interface LessonKitDetailResponse extends LessonKit {
   student_questions: Record<string, unknown>[];
   assessments: Record<string, unknown>[];
 }
-

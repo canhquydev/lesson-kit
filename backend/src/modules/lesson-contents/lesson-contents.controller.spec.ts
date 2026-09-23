@@ -36,7 +36,10 @@ describe('LessonContentsController', () => {
         mockData,
       );
 
-      const response = await controller.findAll({ subject: 'VAT_LI', grade: '10' });
+      const response = await controller.findAll({
+        subject: 'VAT_LI',
+        grade: '10',
+      });
 
       expect(service.findBySubjectAndGrade).toHaveBeenCalledWith(
         'VAT_LI',

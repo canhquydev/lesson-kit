@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ComponentType, LessonKitStatus, SupportLevel } from '../../common/enums';
+import { ComponentType, LessonKitStatus } from '../../common/enums';
 import { GenerationContext } from '../../common/interfaces';
 import { ActivitiesService } from '../activities/activities.service';
 import { AssessmentsService } from '../assessments/assessments.service';
@@ -134,7 +134,7 @@ export class RegenerateService {
       title: kit.lesson_topic || lessonContent.title,
       content: lessonContent.content,
       duration: kit.duration,
-      supportLevel: kit.support_level as SupportLevel,
+      supportLevel: kit.support_level,
     };
 
     let generatedData: unknown[] = [];

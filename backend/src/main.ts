@@ -7,7 +7,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
-  // Global validation pipe (class-validator)
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -17,10 +16,8 @@ async function bootstrap() {
     }),
   );
 
-  // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // CORS: Mở toàn bộ cho mọi nguồn gốc (tự động phản chiếu origin, hỗ trợ cả credentials)
   app.enableCors({
     origin: true,
     credentials: true,

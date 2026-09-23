@@ -15,7 +15,10 @@ export class BaseResponseDto<T = unknown> {
     return new BaseResponseDto({ success: true, data, message });
   }
 
-  static fail(message: string, error?: string | Record<string, unknown>): BaseResponseDto<null> {
+  static fail(
+    message: string,
+    error?: string | Record<string, unknown>,
+  ): BaseResponseDto<null> {
     return new BaseResponseDto({ success: false, data: null, message, error });
   }
 }

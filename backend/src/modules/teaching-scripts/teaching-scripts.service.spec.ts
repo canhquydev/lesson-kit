@@ -543,9 +543,15 @@ describe('TeachingScriptsService', () => {
 
       expect(result).toHaveLength(scripts.length);
       // Assert exact durations are preserved
-      expect(result.find((r) => r.activity_name === 'Khám phá')?.duration_minutes).toBe(8);
-      expect(result.find((r) => r.activity_name === 'Thiết kế')?.duration_minutes).toBe(10);
-      expect(result.find((r) => r.activity_name === 'Thực hành')?.duration_minutes).toBe(12);
+      expect(
+        result.find((r) => r.activity_name === 'Khám phá')?.duration_minutes,
+      ).toBe(8);
+      expect(
+        result.find((r) => r.activity_name === 'Thiết kế')?.duration_minutes,
+      ).toBe(10);
+      expect(
+        result.find((r) => r.activity_name === 'Thực hành')?.duration_minutes,
+      ).toBe(12);
       expect(generateJson).toHaveBeenCalledTimes(1);
     });
 

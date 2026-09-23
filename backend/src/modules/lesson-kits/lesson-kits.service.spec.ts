@@ -373,13 +373,19 @@ describe('LessonKitsService', () => {
       const result = await service.retry(mockKit._id.toHexString());
 
       expect(mockLessonKitModel.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: mockKit._id.toHexString(), status: { $ne: LessonKitStatus.GENERATING } },
+        {
+          _id: mockKit._id.toHexString(),
+          status: { $ne: LessonKitStatus.GENERATING },
+        },
         { status: LessonKitStatus.GENERATING },
         { returnDocument: 'after' },
       );
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith('lesson-kit.generate', {
-        lessonKitId: mockKit._id.toHexString(),
-      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'lesson-kit.generate',
+        {
+          lessonKitId: mockKit._id.toHexString(),
+        },
+      );
       expect(result).toEqual({
         lesson_kit_id: mockKit._id.toHexString(),
         status: LessonKitStatus.GENERATING,
@@ -387,4 +393,3 @@ describe('LessonKitsService', () => {
     });
   });
 });
-
